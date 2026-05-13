@@ -174,9 +174,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/api/expedientes/papelera':   return self._papelera()
         if path == '/api/config/provincias':      return self._provincias()
         if path == '/api/config/analistas':       return self._analistas()
-        if path == '/api/config/garantias':       return self._garantias()
-        if path == '/api/config/lineas':          return self._lineas()
-        if path == '/api/config/tecnicos':        return self._tecnicos()
+        if path == '/api/config/garantias':        return self._garantias()
+        if path == '/api/config/lineas':           return self._lineas()
+        if path == '/api/config/tecnicos':         return self._tecnicos()
+        if path == '/api/config/tecnicos_carga':   return self._tecnicos_carga_get()
 
         if path.startswith('/api/expedientes/'):
             eid = path.split('/')[-1]
@@ -194,9 +195,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path == '/api/expedientes':       return self._create()
-        if path == '/api/expedientes/bulk':  return self._bulk()
-        if path == '/api/carga':             return self._carga_crear()
+        if path == '/api/expedientes':            return self._create()
+        if path == '/api/expedientes/bulk':       return self._bulk()
+        if path == '/api/carga':                  return self._carga_crear()
+        if path == '/api/config/tecnicos_carga':  return self._tecnicos_carga_post()
 
         if path.startswith('/api/expedientes/') and path.endswith('/restaurar'):
             parts = path.split('/')
@@ -527,10 +529,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
+    def _tecnicos_carga_get(self):
+        try:
+            cfg = get_config()
+            self.send_json(cfg.get('tecnicos_carga', []))
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    def _tecnicos_carga_post(self):
+        try:
+            d = self.read_body()
+            action = d.get('action')
+            cfg = get_config()
+            lista = cfg.get('tecnicos_carga', [])
+            if action == 'add':
+                nombre = (d.get('nombre') or '').strip().upper()
+                if not nombre: return self.send_json({'error': 'nombre requerido'}, 400)
+                if nombre not in lista:
+                    lista.append(nombre)
+                    lista.sort()
+            elif action == 'remove':
+                nombre = (d.get('nombre') or '').strip().upper()
+                lista = [x for x in lista if x != nombre]
+            elif action == 'update':
+                old = (d.get('old') or '').strip().upper()
+                new = (d.get('new') or '').strip().upper()
+                lista = [new if x == old else x for x in lista]
+                lista.sort()
+            cfg['tecnicos_carga'] = lista
+            with open(str(CONFIG_PATH), 'w') as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            self.send_json(lista)
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
 # ── Tablero de Carga — API ────────────────────────────────────────────────────
 
     CARGA_FIELDS = [
-        'cuit', 'avalista', 'estado_pei', 'linea_manual',
+        'cuit', 'tec_de_carga', 'estado_pei', 'linea_manual',
         'fecha_respuesta_uep', 'devolvio_legales',
         'motivo_devolucion_legales', 'observaciones_carga',
         'paso_carga_inicial', 'se_solicito', 'tecnico',
@@ -556,11 +592,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             q = "SELECT * FROM expedientes WHERE deleted_at IS NULL AND substr(fecha_carga,1,7) = ?"
             p = [mes]
 
+            tec      = (qs.get('tec')      or [None])[0]
+            tec_uep  = (qs.get('tec_uep')  or [None])[0]
+
             if provincia: q += " AND provincia = ?";          p.append(provincia)
             if linea:     q += " AND (linea_programatica = ? OR linea_manual = ?)"; p += [linea, linea]
             if garantia:  q += " AND garantia = ?";           p.append(garantia)
             if paso:      q += " AND paso_carga_inicial = ?"; p.append(paso)
             if legales:   q += " AND devolvio_legales = ?";   p.append(legales)
+            if tec:       q += " AND tec_de_carga = ?";       p.append(tec)
+            if tec_uep:   q += " AND tecnico LIKE ?";         p.append(f"%{tec_uep}%")
             if search:
                 q += " AND (num_exp LIKE ? OR titular LIKE ? OR cuit LIKE ?)"
                 s = f"%{search}%"; p += [s, s, s]
@@ -617,6 +658,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 by_garantia= agg(conn, 'garantia')
                 by_tec     = agg(conn, 'tec_de_carga')
 
+                # Stats detalladas por técnico de carga
+                tec_detail = conn.execute(f"""
+                    SELECT COALESCE(NULLIF(tec_de_carga,''),'(Sin asignar)') as tec,
+                           COUNT(*) as total,
+                           SUM(CASE WHEN paso_carga_inicial='SI' THEN 1 ELSE 0 END) as paso_si,
+                           SUM(CASE WHEN paso_carga_inicial='NO' THEN 1 ELSE 0 END) as paso_no,
+                           SUM(CASE WHEN devolvio_legales='SI' THEN 1 ELSE 0 END) as legales_si,
+                           monto
+                    {base} GROUP BY tec ORDER BY total DESC
+                """, p).fetchall()
+                by_tec_detail = []
+                for row in tec_detail:
+                    tec_name = row[0]
+                    # sum montos for this tech
+                    montos_tec = [parse_monto(r[0]) for r in conn.execute(
+                        f"SELECT monto {base} AND COALESCE(NULLIF(tec_de_carga,''),'(Sin asignar)')=?",
+                        p + [tec_name]
+                    ).fetchall()]
+                    mt = sum(montos_tec)
+                    by_tec_detail.append({
+                        'tec': row[0], 'total': row[1],
+                        'paso_si': row[2], 'paso_no': row[3], 'legales_si': row[4],
+                        'monto_total': mt,
+                        'promedio': round(mt/row[1], 0) if row[1] else 0,
+                    })
+
                 # Montos por provincia
                 prov_montos = conn.execute(f"""
                     SELECT COALESCE(NULLIF(provincia,''),'(Sin datos)') as prov,
@@ -653,6 +720,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'by_linea':     by_linea,
                 'by_garantia':  by_garantia,
                 'by_tecnico':   by_tec,
+                'by_tec_detail': by_tec_detail,
                 'by_prov_monto': by_prov_monto,
                 'motivos_carga': [{'motivo': r[0], 'n': r[1]} for r in motivos],
                 'motivos_legales': [{'motivo': r[0], 'n': r[1]} for r in motivos_leg],
@@ -690,6 +758,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             'linea_programatica':r.get('linea_normalizada', ''),
             'estado_pei':        r.get('estadoExpediente', ''),
             'fecha_instruccion': (r.get('fechaSolicitud') or '')[:10],
+            'fecha_carga':       (r.get('fechaSolicitud') or '')[:10],
             '_pei': True,
         }
 

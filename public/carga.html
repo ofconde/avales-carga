@@ -29,6 +29,9 @@
       <button class="btn btn-sm btn-outline-light" onclick="openAnual()">
         <i class="bi bi-bar-chart-line"></i> Anual
       </button>
+      <button class="btn btn-sm btn-outline-light" onclick="openAdmin()">
+        <i class="bi bi-gear"></i> Admin
+      </button>
       <button class="btn btn-sm btn-success" onclick="openRegistrar()">
         <i class="bi bi-plus-lg"></i> Registrar expediente
       </button>
@@ -103,24 +106,30 @@
     </div>
   </div>
 
-  <!-- Mini-stats: por provincia / línea / garantía -->
+  <!-- Mini-stats: por provincia / línea / garantía / técnico -->
   <div class="row g-3 mb-3">
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="mini-stats-card">
         <div class="mini-stats-title"><i class="bi bi-geo-alt"></i> Por Provincia</div>
         <div id="by-provincia" class="mini-stats-list"></div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="mini-stats-card">
         <div class="mini-stats-title"><i class="bi bi-tag"></i> Por Línea</div>
         <div id="by-linea" class="mini-stats-list"></div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="mini-stats-card">
         <div class="mini-stats-title"><i class="bi bi-shield"></i> Por Garantía</div>
         <div id="by-garantia" class="mini-stats-list"></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="mini-stats-card">
+        <div class="mini-stats-title"><i class="bi bi-person-badge"></i> Por Técnico de Carga</div>
+        <div id="by-tecnico" class="mini-stats-list"></div>
       </div>
     </div>
   </div>
@@ -141,6 +150,9 @@
       <select class="form-select form-select-sm" id="f-garantia">
         <option value="">Garantía</option>
       </select>
+      <select class="form-select form-select-sm" id="f-tec">
+        <option value="">Téc. Carga</option>
+      </select>
       <select class="form-select form-select-sm" id="f-paso">
         <option value="">Carga inicial</option>
         <option value="SI">✓ Pasó</option>
@@ -160,7 +172,7 @@
     <table class="table table-hover table-sm align-middle carga-table" id="carga-table">
       <thead>
         <tr>
-          <th>F. Carga</th>
+          <th>F. Carga PEI</th>
           <th>Expediente</th>
           <th>CUIT</th>
           <th>Titular / Empresa</th>
@@ -168,9 +180,10 @@
           <th>Monto</th>
           <th>Línea</th>
           <th>Garantía</th>
+          <th>Téc. Carga</th>
           <th>Pasó carga</th>
           <th>Lo solicitado a UEP</th>
-          <th>Técnico UEP</th>
+          <th>Téc. UEP</th>
           <th>F. Resp. UEP</th>
           <th>Dev. Legales</th>
           <th>Motivo Legal</th>
@@ -179,7 +192,7 @@
         </tr>
       </thead>
       <tbody id="carga-tbody">
-        <tr><td colspan="16" class="text-center py-4 text-muted">Cargando…</td></tr>
+        <tr><td colspan="17" class="text-center py-4 text-muted">Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -214,7 +227,7 @@
         <!-- Búsqueda (solo si es nuevo) -->
         <div id="buscar-section">
           <div class="alert alert-info py-2 mb-3">
-            <i class="bi bi-info-circle"></i> Buscá el expediente por número, CUIT o nombre de empresa para traer los datos automáticamente.
+            <i class="bi bi-info-circle"></i> Buscá el expediente por número, CUIT o nombre de empresa para traer los datos automáticamente desde PEI.
           </div>
           <div class="input-group mb-3">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -229,7 +242,7 @@
         <div id="form-section" class="d-none">
           <input type="hidden" id="reg-id">
 
-          <!-- Datos automáticos (de PEI / DB) -->
+          <!-- Datos del expediente -->
           <div class="section-divider">
             <span><i class="bi bi-database"></i> Datos del expediente</span>
             <button type="button" class="btn btn-xs btn-outline-secondary" onclick="showBuscar()">
@@ -262,13 +275,14 @@
               <input class="form-control form-control-sm" id="r-garantia" readonly>
             </div>
             <div class="col-md-3">
-              <label class="form-label form-label-sm">Avalista</label>
-              <input class="form-control form-control-sm" id="r-avalista"
-                     placeholder="Ej: FOGABA">
+              <label class="form-label form-label-sm">Fecha de carga PEI <span class="text-muted">(editable)</span></label>
+              <input type="date" class="form-control form-control-sm" id="r-fecha_carga">
             </div>
             <div class="col-md-3">
-              <label class="form-label form-label-sm">Fecha de carga PEI</label>
-              <input class="form-control form-control-sm" id="r-fecha_carga" readonly>
+              <label class="form-label form-label-sm">Técnico de Carga <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="r-tec_de_carga">
+                <option value="">— Seleccionar —</option>
+              </select>
             </div>
             <div class="col-md-4">
               <label class="form-label form-label-sm">Línea detectada (PEI)</label>
@@ -297,7 +311,7 @@
             </div>
           </div>
 
-          <!-- Campos de carga inicial -->
+          <!-- Carga inicial -->
           <div class="section-divider"><span><i class="bi bi-clipboard-check"></i> Carga inicial</span></div>
           <div class="row g-2 mb-3">
             <div class="col-md-3">
@@ -309,7 +323,7 @@
                 <option value="NO">No</option>
               </select>
             </div>
-            <div class="col-md-9" id="motivo-carga-row">
+            <div class="col-md-9" id="motivo-carga-row" style="display:none">
               <label class="form-label form-label-sm">Lo que se solicitó a la UEP (motivo observación)</label>
               <input class="form-control form-control-sm" id="r-se_solicito"
                      list="motivos-carga-dl"
@@ -329,7 +343,7 @@
             </div>
           </div>
 
-          <!-- Técnico UEP y respuesta -->
+          <!-- UEP -->
           <div class="section-divider"><span><i class="bi bi-person-lines-fill"></i> UEP</span></div>
           <div class="row g-2 mb-3">
             <div class="col-md-4">
@@ -345,7 +359,7 @@
             </div>
           </div>
 
-          <!-- Devolución Legales -->
+          <!-- Legales -->
           <div class="section-divider"><span><i class="bi bi-file-earmark-text"></i> Legales</span></div>
           <div class="row g-2 mb-3">
             <div class="col-md-3">
@@ -419,6 +433,34 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     Modal: Admin — Técnicos de Carga
+═════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="adminModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-carga text-white">
+        <h5 class="modal-title"><i class="bi bi-gear"></i> Administración</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <h6 class="fw-bold mb-3"><i class="bi bi-person-badge me-1"></i> Técnicos de Carga</h6>
+        <div id="admin-tec-lista" class="mb-3"></div>
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control text-uppercase" id="admin-tec-nuevo"
+                 placeholder="Nuevo técnico (APELLIDO NOMBRE)">
+          <button class="btn btn-primary" onclick="adminTecAgregar()">
+            <i class="bi bi-plus-lg"></i> Agregar
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
   <div id="toast" class="toast align-items-center text-white border-0" role="alert">
@@ -435,8 +477,9 @@
 // ── Estado global ─────────────────────────────────────────────────────────────
 let PROVINCIAS = {};
 let MESES_DISPONIBLES = [];
-let mesCurrent = '';        // 'YYYY-MM'
-let mesActual  = '';        // mes real de hoy
+let TECNICOS_CARGA = [];
+let mesCurrent = '';
+let mesActual  = '';
 let offset     = 0;
 const LIMIT    = 150;
 let totalRows  = 0;
@@ -448,6 +491,7 @@ const MES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
 // ── Bootstrap instances ───────────────────────────────────────────────────────
 const regModal   = new bootstrap.Modal(document.getElementById('regModal'));
 const anualModal = new bootstrap.Modal(document.getElementById('anualModal'));
+const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 const toastEl    = new bootstrap.Toast(document.getElementById('toast'), {delay: 3000});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -533,6 +577,7 @@ function getFilters() {
     provincia:qs('f-provincia').value,
     linea:    qs('f-linea').value,
     garantia: qs('f-garantia').value,
+    tec:      qs('f-tec').value,
     paso:     qs('f-paso').value,
     legales:  qs('f-legales').value,
   };
@@ -545,7 +590,7 @@ function buildQS(extra = {}) {
 }
 
 function clearFilters() {
-  ['f-search','f-provincia','f-linea','f-garantia','f-paso','f-legales']
+  ['f-search','f-provincia','f-linea','f-garantia','f-tec','f-paso','f-legales']
     .forEach(id => { qs(id).value = ''; });
   offset = 0;
   loadMes();
@@ -580,6 +625,7 @@ function renderMiniStats(s) {
   const maxProv = s.by_provincia?.[0]?.total || 1;
   const maxLin  = s.by_linea?.[0]?.total || 1;
   const maxGar  = s.by_garantia?.[0]?.total || 1;
+  const maxTec  = s.by_tecnico?.[0]?.total || 1;
 
   function renderList(containerId, items, max) {
     const c = qs(containerId);
@@ -596,12 +642,13 @@ function renderMiniStats(s) {
   renderList('by-provincia', s.by_provincia, maxProv);
   renderList('by-linea',     s.by_linea,     maxLin);
   renderList('by-garantia',  s.by_garantia,  maxGar);
+  renderList('by-tecnico',   s.by_tecnico,   maxTec);
 }
 
 function renderTable(rows) {
   const tbody = qs('carga-tbody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">Sin solicitudes para este período</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="17" class="text-center py-4 text-muted">Sin solicitudes para este período</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => {
@@ -626,6 +673,7 @@ function renderTable(rows) {
       <td class="cell-small text-end">${esc(r.monto)}</td>
       <td class="cell-small">${esc(linea)}</td>
       <td class="cell-small">${esc(r.garantia)}</td>
+      <td class="cell-small">${esc(r.tec_de_carga)}</td>
       <td class="text-center">${pasoBadge}</td>
       <td class="cell-obs">${esc(r.se_solicito)}</td>
       <td class="cell-small">${esc(r.tecnico)}</td>
@@ -690,7 +738,6 @@ function buscarExp(val) {
         '<button class="btn btn-sm btn-outline-primary" onclick="crearManual()"><i class="bi bi-plus-circle me-1"></i>Crear registro manual</button>';
       return;
     }
-    // Guardar datos PEI en memoria temporal para selección
     window._buscarRows = rows;
     c.innerHTML = rows.map((r, i) => `
       <div class="buscar-item" onclick="seleccionarRow(${i})">
@@ -707,17 +754,14 @@ async function seleccionarRow(idx) {
   const r = (window._buscarRows || [])[idx];
   if (!r) return;
   if (r._pei) {
-    // Viene de PEI: pre-llenar formulario con datos de avales, sin id
     qs('buscar-section').classList.add('d-none');
     fillForm(r);
-    // Campos base editables para que el técnico corrija si hace falta
     ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {
       const el = qs(f); if (el) el.removeAttribute('readonly');
     });
     qs('form-section').classList.remove('d-none');
     qs('btn-guardar').classList.remove('d-none');
   } else {
-    // Registro local: traer con id
     const res  = await fetch(`/api/expedientes/${r.id}`);
     const data = await res.json();
     qs('buscar-section').classList.add('d-none');
@@ -730,11 +774,9 @@ async function seleccionarRow(idx) {
 function crearManual() {
   qs('buscar-section').classList.add('d-none');
   fillForm({});
-  qs('r-num_exp').removeAttribute('readonly');
-  qs('r-titular').removeAttribute('readonly');
-  qs('r-provincia').removeAttribute('readonly');
-  qs('r-monto').removeAttribute('readonly');
-  qs('r-garantia').removeAttribute('readonly');
+  ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {
+    const el = qs(f); if (el) el.removeAttribute('readonly');
+  });
   qs('form-section').classList.remove('d-none');
   qs('btn-guardar').classList.remove('d-none');
   qs('r-num_exp').focus();
@@ -756,8 +798,8 @@ function fillForm(d) {
   qs('r-provincia').value             = d.provincia || '';
   qs('r-monto').value                 = d.monto || '';
   qs('r-garantia').value              = d.garantia || '';
-  qs('r-avalista').value              = d.avalista || '';
   qs('r-fecha_carga').value           = d.fecha_carga || new Date().toISOString().slice(0,10);
+  qs('r-tec_de_carga').value          = d.tec_de_carga || '';
   qs('r-linea_pei').value             = d.linea_programatica || '';
   qs('r-linea_manual').value          = d.linea_manual || '';
   qs('r-estado_pei').value            = d.estado_pei || '';
@@ -792,7 +834,7 @@ async function guardarRegistro() {
     monto:                     qs('r-monto').value.trim(),
     garantia:                  qs('r-garantia').value.trim(),
     cuit:                      qs('r-cuit').value.trim(),
-    avalista:                  qs('r-avalista').value.trim(),
+    tec_de_carga:              qs('r-tec_de_carga').value,
     estado_pei:                qs('r-estado_pei').value.trim(),
     linea_programatica:        qs('r-linea_pei').value.trim(),
     linea_manual:              qs('r-linea_manual').value,
@@ -880,7 +922,7 @@ async function loadAnual() {
         </div>`).join('')}
     </div>
     <h6 class="fw-semibold mb-2">Detalle mensual</h6>
-    <table class="table table-sm table-bordered">
+    <table class="table table-sm table-bordered mb-4">
       <thead class="table-light">
         <tr><th>Mes</th><th class="text-end">Solicitudes</th><th class="text-end">Monto total</th><th class="text-end">Promedio</th></tr>
       </thead>
@@ -893,7 +935,98 @@ async function loadAnual() {
             <td class="text-end">${fmtMonto(m.total ? m.monto_total/m.total : 0)}</td>
           </tr>`).join('')}
       </tbody>
-    </table>`;
+    </table>
+    ${(data.por_tecnico && data.por_tecnico.length) ? `
+    <h6 class="fw-semibold mb-2">Por Técnico de Carga — ${year}</h6>
+    <table class="table table-sm table-bordered">
+      <thead class="table-light">
+        <tr>
+          <th>Técnico</th>
+          <th class="text-end">Solicitudes</th>
+          <th class="text-end">Monto total</th>
+          <th class="text-end">Promedio</th>
+          <th class="text-end">Pasó carga</th>
+          <th class="text-end">Observados</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.por_tecnico.map(t => `
+          <tr>
+            <td>${esc(t.tec)}</td>
+            <td class="text-end">${t.total}</td>
+            <td class="text-end">${fmtMonto(t.monto_total)}</td>
+            <td class="text-end">${fmtMonto(t.total ? t.monto_total/t.total : 0)}</td>
+            <td class="text-end">${t.paso_si ?? 0}</td>
+            <td class="text-end">${t.paso_no ?? 0}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : ''}`;
+}
+
+// ── Admin: Técnicos de Carga ──────────────────────────────────────────────────
+function openAdmin() {
+  adminModal.show();
+  renderAdminTec();
+}
+
+async function renderAdminTec() {
+  const res  = await fetch('/api/config/tecnicos_carga');
+  TECNICOS_CARGA = await res.json();
+  const c = qs('admin-tec-lista');
+  if (!TECNICOS_CARGA.length) {
+    c.innerHTML = '<p class="text-muted small">Sin técnicos registrados.</p>';
+    return;
+  }
+  c.innerHTML = TECNICOS_CARGA.map(t => `
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <span class="flex-grow-1 fw-semibold small">${esc(t)}</span>
+      <button class="btn btn-xs btn-outline-danger" onclick="adminTecEliminar('${t.replace(/'/g,"\\'")}')">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>`).join('');
+  // Actualizar dropdown del formulario
+  populateTecDropdown();
+}
+
+async function adminTecAgregar() {
+  const nombre = (qs('admin-tec-nuevo').value || '').trim().toUpperCase();
+  if (!nombre) return;
+  await fetch('/api/config/tecnicos_carga', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'add', nombre}),
+  });
+  qs('admin-tec-nuevo').value = '';
+  renderAdminTec();
+}
+
+async function adminTecEliminar(nombre) {
+  if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+  await fetch('/api/config/tecnicos_carga', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'remove', nombre}),
+  });
+  renderAdminTec();
+}
+
+function populateTecDropdown() {
+  const sel = qs('r-tec_de_carga');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Seleccionar —</option>';
+  TECNICOS_CARGA.forEach(t => {
+    sel.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+  sel.value = current;
+
+  // Filtro
+  const fTec = qs('f-tec');
+  const fCurrent = fTec.value;
+  fTec.innerHTML = '<option value="">Téc. Carga</option>';
+  TECNICOS_CARGA.forEach(t => {
+    fTec.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+  fTec.value = fCurrent;
 }
 
 // ── Inicialización ────────────────────────────────────────────────────────────
@@ -901,19 +1034,20 @@ async function init() {
   mesActual  = hoyMes();
   mesCurrent = mesActual;
 
-  const [provRes, mesesRes, tecRes, garRes, linRes, provListRes] = await Promise.all([
+  const [provRes, mesesRes, tecRes, garRes, linRes, tecCargaRes] = await Promise.all([
     fetch('/api/config/provincias'),
     fetch('/api/carga/meses'),
     fetch('/api/config/tecnicos'),
     fetch('/api/config/garantias'),
     fetch('/api/config/lineas'),
-    fetch('/api/config/provincias'),
+    fetch('/api/config/tecnicos_carga'),
   ]);
   PROVINCIAS = await provRes.json();
   MESES_DISPONIBLES = await mesesRes.json();
   const tecnicos  = await tecRes.json();
   const garantias = await garRes.json();
   const lineas    = await linRes.json();
+  TECNICOS_CARGA  = await tecCargaRes.json();
 
   // Selector histórico
   const selH = qs('sel-mes-historico');
@@ -935,12 +1069,15 @@ async function init() {
   const fGar = qs('f-garantia');
   garantias.forEach(g => { fGar.innerHTML += `<option value="${g}">${g}</option>`; });
 
+  // Técnicos de carga (dropdown form + filtro)
+  populateTecDropdown();
+
   // Datalist técnicos UEP
   const dl = qs('tecnicos-uep-dl');
   tecnicos.forEach(t => { dl.innerHTML += `<option value="${t}">`; });
 
   // Eventos filtros
-  ['f-search','f-provincia','f-linea','f-garantia','f-paso','f-legales'].forEach(id => {
+  ['f-search','f-provincia','f-linea','f-garantia','f-tec','f-paso','f-legales'].forEach(id => {
     const el = qs(id);
     el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => { offset = 0; loadMes(); });
   });
@@ -948,7 +1085,6 @@ async function init() {
   updatePeriodUI();
   loadMes();
 
-  // Inicializar año en modal anual con el año actual
   qs('sel-year').value = String(new Date().getFullYear());
 }
 

@@ -8,6 +8,13 @@
     { "nombre": "Matías Ricci",       "provincias": ["LP", "MZ", "NQ", "RN", "TF"] },
     { "nombre": "Soledad Coste",      "provincias": ["SL", "SE", "TU"] }
   ],
+  "tecnicos_carga": [
+    "MARIA JOSE GARCIA",
+    "GABRIELA CARRION",
+    "JIMENA LLOVERAS",
+    "MAURO TELLO",
+    "OMAR CONDE"
+  ],
   "provincias": {
     "BA": "Buenos Aires",
     "CA": "Catamarca",
