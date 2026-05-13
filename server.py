@@ -673,7 +673,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
-    PEI_API = os.environ.get('PEI_API_URL', 'https://avalescfi.up.railway.app')
+    PEI_API     = os.environ.get('PEI_API_URL',  'https://recepcionavales.cfi.org.ar')
+    PEI_API_KEY = os.environ.get('PEI_API_KEY',  'cfi-avales-sync-2026')
+
+    def _pei_to_row(self, r):
+        monto_raw = r.get('importeSolicitado')
+        monto = f"$ {int(monto_raw):,}".replace(',', '.') if monto_raw else ''
+        return {
+            'id':                None,
+            'num_exp':           r.get('expediente', ''),
+            'titular':           r.get('razonSocial', ''),
+            'cuit':              r.get('cuit', ''),
+            'provincia':         r.get('provincia', ''),
+            'monto':             monto,
+            'garantia':          r.get('garantia_display', ''),
+            'linea_programatica':r.get('linea_normalizada', ''),
+            'estado_pei':        r.get('estadoExpediente', ''),
+            'fecha_instruccion': (r.get('fechaSolicitud') or '')[:10],
+            '_pei': True,
+        }
 
     def _carga_buscar(self, qs):
         try:
@@ -681,31 +699,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if len(q_str) < 2:
                 return self.send_json([])
 
-            # Buscar en PEI (sistema avales)
-            results = []
-            try:
-                url = f"{self.PEI_API}/api/avales?search={urllib.parse.quote(q_str)}&limit=20"
-                req = urllib.request.Request(url, headers={'Accept': 'application/json'})
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data = json.loads(resp.read())
-                for r in data.get('data', []):
-                    results.append({
-                        'id':                None,
-                        'num_exp':           r.get('expediente', ''),
-                        'titular':           r.get('titulares', ''),
-                        'provincia':         r.get('provincia', ''),
-                        'monto':             r.get('monto', ''),
-                        'garantia':          r.get('garantia', ''),
-                        'nombre_proyecto':   r.get('nombre_proyecto', ''),
-                        'linea_programatica':r.get('linea_programatica', ''),
-                        'fecha_instruccion': r.get('fecha_instruccion', ''),
-                        'fecha_carga':       r.get('fecha_carga', ''),
-                        '_pei': True,
-                    })
-            except Exception:
-                pass  # si PEI no responde, seguir con DB local
-
-            # También buscar en DB local (expedientes ya registrados en carga)
+            # Buscar en DB local primero
             s = f"%{q_str}%"
             with get_db() as conn:
                 rows = conn.execute("""
@@ -714,13 +708,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
                       AND (num_exp LIKE ? OR titular LIKE ? OR cuit LIKE ?)
                     ORDER BY fecha_carga DESC LIMIT 20
                 """, (s, s, s)).fetchall()
+            local = [dict(r) for r in rows]
+            local_nums = {r['num_exp'] for r in local}
 
-            # Priorizar registros locales (ya tienen datos de carga)
-            local_nums = {dict(r)['num_exp'] for r in rows}
-            pei_only = [r for r in results if r['num_exp'] not in local_nums]
+            # Buscar en PEI para traer los que no están en DB local
+            pei_only = []
+            try:
+                url = f"{self.PEI_API}/api/avales?search={urllib.parse.quote(q_str)}&limit=20"
+                req = urllib.request.Request(url, headers={
+                    'Accept': 'application/json',
+                    'X-API-Key': self.PEI_API_KEY,
+                })
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read())
+                for r in data.get('data', []):
+                    num = r.get('expediente', '')
+                    if num and num not in local_nums:
+                        pei_only.append(self._pei_to_row(r))
+            except Exception:
+                pass
 
-            final = [dict(r) for r in rows] + pei_only
-            self.send_json(final[:25])
+            self.send_json((local + pei_only)[:25])
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
