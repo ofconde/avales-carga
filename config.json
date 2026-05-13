@@ -1,0 +1,36 @@
+{
+  "port": 3001,
+  "analistas": [
+    { "nombre": "Jimena Pino",        "provincias": ["BA", "CT"] },
+    { "nombre": "Sebastián Estevez",  "provincias": ["CA", "CH", "LR", "SF"] },
+    { "nombre": "Lucas Medina",       "provincias": ["CB", "CO", "ER", "SJ", "SC"] },
+    { "nombre": "Florencia Aguirre",  "provincias": ["FO", "JU", "MI", "SA"] },
+    { "nombre": "Matías Ricci",       "provincias": ["LP", "MZ", "NQ", "RN", "TF"] },
+    { "nombre": "Soledad Coste",      "provincias": ["SL", "SE", "TU"] }
+  ],
+  "provincias": {
+    "BA": "Buenos Aires",
+    "CA": "Catamarca",
+    "CH": "Chaco",
+    "CB": "Chubut",
+    "CO": "Córdoba",
+    "CT": "Corrientes",
+    "ER": "Entre Ríos",
+    "FO": "Formosa",
+    "JU": "Jujuy",
+    "LP": "La Pampa",
+    "LR": "La Rioja",
+    "MZ": "Mendoza",
+    "MI": "Misiones",
+    "NQ": "Neuquén",
+    "RN": "Río Negro",
+    "SA": "Salta",
+    "SJ": "San Juan",
+    "SL": "San Luis",
+    "SC": "Santa Cruz",
+    "SF": "Santa Fe",
+    "SE": "Santiago del Estero",
+    "TF": "Tierra del Fuego",
+    "TU": "Tucumán"
+  }
+}

@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carga de Expedientes — CFI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark mb-4">
+  <div class="navbar-inner">
+    <div class="navbar-brand-wrap">
+      <img src="https://cfi.org.ar/assets/images/logo-old.svg?v1" alt="CFI" class="navbar-logo-img">
+      <div class="navbar-divider"></div>
+      <div>
+        <div class="navbar-title">Carga de Expedientes</div>
+        <div class="navbar-subtitle">Financiamiento Productivo — CFI</div>
+      </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <button class="btn btn-sm btn-outline-light" onclick="openPapelera()">
+        <i class="bi bi-trash3"></i> Papelera
+      </button>
+      <button class="btn btn-sm btn-success" onclick="openModal()">
+        <i class="bi bi-plus-lg"></i> Nuevo expediente
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+
+  <!-- Stats -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card stat-card stat-card--blue">
+        <div class="stat-icon"><i class="bi bi-folder2-open"></i></div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">Total expedientes</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card stat-card stat-card--green">
+        <div class="stat-icon"><i class="bi bi-shield-check"></i></div>
+        <div class="stat-value" id="stat-recibidos">—</div>
+        <div class="stat-label">Avales recibidos</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card stat-card stat-card--gray">
+        <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
+        <div class="stat-value" id="stat-pendientes">—</div>
+        <div class="stat-label">Pendientes</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card stat-card stat-card--orange">
+        <div class="stat-icon"><i class="bi bi-camera"></i></div>
+        <div class="stat-value" id="stat-sin-tasacion">—</div>
+        <div class="stat-label">Sin tasación</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-bar mb-3">
+    <div class="filters-row-top">
+      <div class="input-group input-group-sm filters-search">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="search-input" placeholder="Buscar por expediente, titular, proyecto...">
+      </div>
+      <select class="form-select form-select-sm" id="filter-status">
+        <option value="">Estado</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="recibido">Recibido</option>
+        <option value="sin_instruccion">Sin instrucción</option>
+        <option value="sin_tasacion">Recibido sin tasación</option>
+      </select>
+      <select class="form-select form-select-sm" id="filter-garantia">
+        <option value="">Fondo/Garantía</option>
+      </select>
+      <select class="form-select form-select-sm" id="filter-linea">
+        <option value="">Línea</option>
+      </select>
+      <select class="form-select form-select-sm" id="filter-analista">
+        <option value="">Analista</option>
+      </select>
+      <select class="form-select form-select-sm" id="filter-provincia">
+        <option value="">Provincia</option>
+      </select>
+      <button class="btn-filter-clear" onclick="clearFilters()" title="Limpiar filtros">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-wrapper">
+    <table class="table table-hover table-sm align-middle" id="main-table">
+      <thead>
+        <tr>
+          <th>Expediente</th>
+          <th>Titular</th>
+          <th>Prov.</th>
+          <th>Proyecto</th>
+          <th>Línea</th>
+          <th>Monto</th>
+          <th>Garantía</th>
+          <th>F. Instrucción</th>
+          <th>F. Aval Rec.</th>
+          <th>F. Tasación</th>
+          <th>F. Carga</th>
+          <th>Tec. Carga</th>
+          <th>Paso Inicial</th>
+          <th>Se Solicitó</th>
+          <th>Técnico</th>
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr><td colspan="16" class="text-center py-4 text-muted">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Paginación -->
+  <div class="d-flex justify-content-between align-items-center mt-3 mb-5" id="pagination-bar">
+    <span class="text-muted small" id="pagination-info"></span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" id="btn-prev" onclick="prevPage()">
+        <i class="bi bi-chevron-left"></i> Anterior
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" id="btn-next" onclick="nextPage()">
+        Siguiente <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Modal Crear/Editar -->
+<div class="modal fade" id="expModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modal-title">Nuevo Expediente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="exp-form">
+          <input type="hidden" id="f-id">
+          <div class="row g-3">
+            <!-- Fila 1: Expediente, Titular, Provincia -->
+            <div class="col-md-3">
+              <label class="form-label">N° Expediente <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="f-num_exp"
+                     placeholder="2025-CR-BA-000001" required>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Titular <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="f-titular" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Provincia <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="f-provincia" required>
+                <option value="">— Seleccionar —</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Monto ($)</label>
+              <input type="text" class="form-control form-control-sm" id="f-monto" placeholder="$ 1.000.000">
+            </div>
+            <!-- Fila 2: Proyecto, Línea, Garantía -->
+            <div class="col-md-4">
+              <label class="form-label">Nombre del Proyecto</label>
+              <input type="text" class="form-control form-control-sm" id="f-nombre_proyecto">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Línea Programática</label>
+              <select class="form-select form-select-sm" id="f-linea_programatica">
+                <option value="">— Seleccionar —</option>
+                <option>MUJERES</option>
+                <option>VERDE</option>
+                <option>CADENA DE VALOR</option>
+                <option>LINEA TRADICIONAL</option>
+                <option>EXPORTACION</option>
+                <option>ER-MICROEMPRESAS</option>
+                <option>COMPETITIVIDAD PYME</option>
+                <option>PROGRAMATICA - VERDE</option>
+                <option>PROGRAMATICA - MUJERES</option>
+                <option>CADENA DE VALOR - GENETICA BOVINA</option>
+                <option>CADENA DE VALOR - MAQUINARIA AGRICOLA</option>
+                <option>TRIPLE IMPACTO - SUSTENTABLES</option>
+                <option>TRIPLE IMPACTO - RIEGO</option>
+                <option>TRIPLE IMPACTO - MUJERES</option>
+                <option>TRIPLE IMPACTO - PROVEEDORES</option>
+                <option>TRIPLE IMPACTO - ENERGETICA</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Garantía / Fondo</label>
+              <input type="text" class="form-control form-control-sm" id="f-garantia"
+                     list="garantias-list" placeholder="Ej: FOGAPLAR">
+              <datalist id="garantias-list"></datalist>
+            </div>
+            <!-- Fila 3: Fechas -->
+            <div class="col-md-3">
+              <label class="form-label">Fecha Instrucción</label>
+              <input type="date" class="form-control form-control-sm" id="f-fecha_instruccion">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fecha Aval Recibido</label>
+              <input type="date" class="form-control form-control-sm" id="f-fecha_aval_recibido">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fecha Tasación Recibida</label>
+              <input type="date" class="form-control form-control-sm" id="f-fecha_tasacion_recibida">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fecha Carga</label>
+              <input type="date" class="form-control form-control-sm" id="f-fecha_carga">
+            </div>
+            <!-- Fila 4: Campos de gestión -->
+            <div class="col-md-3">
+              <label class="form-label">Tec. de Carga</label>
+              <input type="text" class="form-control form-control-sm" id="f-tec_de_carga"
+                     placeholder="Ej: OMAR">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Paso Carga Inicial?</label>
+              <select class="form-select form-select-sm" id="f-paso_carga_inicial">
+                <option value="">—</option>
+                <option value="SI">SI</option>
+                <option value="NO">NO</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Se Solicitó</label>
+              <input type="text" class="form-control form-control-sm" id="f-se_solicito"
+                     placeholder="A quién se solicitó">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Técnico</label>
+              <input type="text" class="form-control form-control-sm" id="f-tecnico"
+                     list="tecnicos-list">
+              <datalist id="tecnicos-list"></datalist>
+            </div>
+            <!-- Observaciones -->
+            <div class="col-12">
+              <label class="form-label">Observaciones</label>
+              <textarea class="form-control form-control-sm" id="f-observaciones" rows="2"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="saveExp()">
+          <i class="bi bi-floppy"></i> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Papelera -->
+<div class="modal fade" id="papeleraModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-trash3"></i> Papelera</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Expediente</th><th>Titular</th><th>Prov.</th>
+                <th>Garantía</th><th>Eliminado</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="papelera-body">
+              <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="toast" class="toast align-items-center text-white border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-msg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// ── Estado global ─────────────────────────────────────────────────────────────
+let PROVINCIAS = {};
+let ANALISTAS  = [];
+let offset = 0;
+const LIMIT = 100;
+let totalRows = 0;
+
+// ── Bootstrap instances ───────────────────────────────────────────────────────
+const expModal      = new bootstrap.Modal(document.getElementById('expModal'));
+const papeleraModal = new bootstrap.Modal(document.getElementById('papeleraModal'));
+const toastEl       = new bootstrap.Toast(document.getElementById('toast'), {delay: 3000});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(s) {
+  if (!s) return '—';
+  const p = s.slice(0,10).split('-');
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+function showToast(msg, ok = true) {
+  const el = document.getElementById('toast');
+  el.className = `toast align-items-center text-white border-0 bg-${ok ? 'success' : 'danger'}`;
+  document.getElementById('toast-msg').textContent = msg;
+  toastEl.show();
+}
+
+function qs(id) { return document.getElementById(id); }
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+function getFilters() {
+  return {
+    search:   qs('search-input').value.trim(),
+    status:   qs('filter-status').value,
+    garantia: qs('filter-garantia').value,
+    linea:    qs('filter-linea').value,
+    analista: qs('filter-analista').value,
+    provincia: qs('filter-provincia').value,
+  };
+}
+
+function buildQS(extra = {}) {
+  const f = {...getFilters(), ...extra};
+  return Object.entries(f)
+    .filter(([,v]) => v)
+    .map(([k,v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('&');
+}
+
+function clearFilters() {
+  ['search-input','filter-status','filter-garantia','filter-linea','filter-analista','filter-provincia']
+    .forEach(id => { const el = qs(id); if(el.tagName==='INPUT') el.value=''; else el.value=''; });
+  offset = 0;
+  loadData();
+}
+
+// ── Carga de datos ────────────────────────────────────────────────────────────
+async function loadData() {
+  const qs_str = buildQS({limit: LIMIT, offset});
+  const res  = await fetch(`/api/expedientes?${qs_str}`);
+  const json = await res.json();
+
+  totalRows = json.total;
+  renderTable(json.data);
+  renderStats(json.stats || {});
+  renderPagination();
+}
+
+function renderStats(s) {
+  qs('stat-total').textContent        = s.total ?? '—';
+  qs('stat-recibidos').textContent    = s.recibidos ?? '—';
+  qs('stat-pendientes').textContent   = s.pendientes ?? '—';
+  qs('stat-sin-tasacion').textContent = s.sin_tasacion ?? '—';
+}
+
+function renderTable(rows) {
+  const tbody = qs('table-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">Sin resultados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const prov   = PROVINCIAS[r.provincia] || r.provincia || '—';
+    const estado = r.fecha_aval_recibido ? 'recibido' : 'pendiente';
+
+    return `<tr class="row-${estado}">
+      <td class="cell-exp">
+        <span class="badge-estado badge-${estado}">${r.fecha_aval_recibido ? 'REC' : 'PEN'}</span>
+        <span class="exp-num">${r.num_exp || '—'}</span>
+      </td>
+      <td class="cell-text">${esc(r.titular)}</td>
+      <td><span class="prov-badge" title="${prov}">${r.provincia || '—'}</span></td>
+      <td class="cell-text">${esc(r.nombre_proyecto)}</td>
+      <td class="cell-small">${esc(r.linea_programatica)}</td>
+      <td class="cell-small text-end">${esc(r.monto)}</td>
+      <td class="cell-small">${esc(r.garantia)}</td>
+      <td class="cell-date">${fmtDate(r.fecha_instruccion)}</td>
+      <td class="cell-date">${fmtDate(r.fecha_aval_recibido)}</td>
+      <td class="cell-date ${!r.fecha_tasacion_recibida && r.fecha_aval_recibido ? 'missing-date' : ''}">${fmtDate(r.fecha_tasacion_recibida)}</td>
+      <td class="cell-date">${fmtDate(r.fecha_carga)}</td>
+      <td class="cell-small">${esc(r.tec_de_carga)}</td>
+      <td class="cell-small text-center">${esc(r.paso_carga_inicial)}</td>
+      <td class="cell-small">${esc(r.se_solicito)}</td>
+      <td class="cell-small">${esc(r.tecnico)}</td>
+      <td class="col-acciones">
+        <button class="btn btn-xs btn-outline-primary" onclick="editExp(${r.id})" title="Editar">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <button class="btn btn-xs btn-outline-danger" onclick="deleteExp(${r.id}, '${esc(r.num_exp)}')" title="Eliminar">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '—';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderPagination() {
+  const from = offset + 1;
+  const to   = Math.min(offset + LIMIT, totalRows);
+  qs('pagination-info').textContent = totalRows
+    ? `Mostrando ${from}–${to} de ${totalRows} expedientes`
+    : 'Sin resultados';
+  qs('btn-prev').disabled = offset === 0;
+  qs('btn-next').disabled = offset + LIMIT >= totalRows;
+}
+
+function prevPage() { offset = Math.max(0, offset - LIMIT); loadData(); }
+function nextPage() { offset += LIMIT; loadData(); }
+
+// ── Modal crear/editar ────────────────────────────────────────────────────────
+function openModal(data = null) {
+  const form = qs('exp-form');
+  form.reset();
+  qs('f-id').value = '';
+  qs('modal-title').textContent = data ? 'Editar Expediente' : 'Nuevo Expediente';
+
+  if (data) {
+    ['id','num_exp','titular','provincia','nombre_proyecto','linea_programatica',
+     'monto','garantia','fecha_instruccion','fecha_aval_recibido',
+     'fecha_tasacion_recibida','fecha_carga','tec_de_carga',
+     'paso_carga_inicial','se_solicito','tecnico','observaciones'].forEach(k => {
+      const el = qs(`f-${k}`);
+      if (el) el.value = data[k] || '';
+    });
+  }
+  expModal.show();
+}
+
+async function editExp(id) {
+  const res = await fetch(`/api/expedientes/${id}`);
+  const data = await res.json();
+  openModal(data);
+}
+
+async function saveExp() {
+  const id = qs('f-id').value;
+  const payload = {};
+  ['num_exp','titular','provincia','nombre_proyecto','linea_programatica',
+   'monto','garantia','fecha_instruccion','fecha_aval_recibido',
+   'fecha_tasacion_recibida','fecha_carga','tec_de_carga',
+   'paso_carga_inicial','se_solicito','tecnico','observaciones'].forEach(k => {
+    payload[k] = qs(`f-${k}`).value.trim() || null;
+  });
+
+  if (!payload.num_exp) { alert('El N° de expediente es obligatorio.'); return; }
+  if (!payload.provincia) { alert('Seleccioná una provincia.'); return; }
+
+  const url    = id ? `/api/expedientes/${id}` : '/api/expedientes';
+  const method = id ? 'PUT' : 'POST';
+  const res    = await fetch(url, {
+    method, headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+
+  if (json.error) { showToast(json.error, false); return; }
+  showToast(id ? 'Expediente actualizado.' : 'Expediente creado.');
+  expModal.hide();
+  loadData();
+}
+
+async function deleteExp(id, num) {
+  if (!confirm(`¿Eliminar el expediente ${num}? Se puede restaurar desde la papelera.`)) return;
+  await fetch(`/api/expedientes/${id}`, { method: 'DELETE' });
+  showToast('Expediente eliminado.');
+  loadData();
+}
+
+// ── Papelera ──────────────────────────────────────────────────────────────────
+async function openPapelera() {
+  const res  = await fetch('/api/expedientes/papelera');
+  const rows = await res.json();
+  const tbody = qs('papelera-body');
+
+  tbody.innerHTML = rows.length
+    ? rows.map(r => `<tr>
+        <td>${esc(r.num_exp)}</td>
+        <td>${esc(r.titular)}</td>
+        <td>${r.provincia || '—'}</td>
+        <td>${esc(r.garantia)}</td>
+        <td>${fmtDate(r.deleted_at)}</td>
+        <td>
+          <button class="btn btn-xs btn-outline-success" onclick="restaurar(${r.id})">
+            <i class="bi bi-arrow-counterclockwise"></i> Restaurar
+          </button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="text-center text-muted py-3">La papelera está vacía.</td></tr>';
+
+  papeleraModal.show();
+}
+
+async function restaurar(id) {
+  await fetch(`/api/expedientes/${id}/restaurar`, { method: 'POST' });
+  showToast('Expediente restaurado.');
+  openPapelera();
+  loadData();
+}
+
+// ── Inicialización ────────────────────────────────────────────────────────────
+async function init() {
+  const [provRes, analRes, garRes, linRes, tecRes] = await Promise.all([
+    fetch('/api/config/provincias'),
+    fetch('/api/config/analistas'),
+    fetch('/api/config/garantias'),
+    fetch('/api/config/lineas'),
+    fetch('/api/config/tecnicos'),
+  ]);
+  PROVINCIAS = await provRes.json();
+  ANALISTAS  = await analRes.json();
+  const garantias = await garRes.json();
+  const lineas    = await linRes.json();
+  const tecnicos  = await tecRes.json();
+
+  // Provincia filter + form select
+  const provSelect = qs('filter-provincia');
+  const fProv      = qs('f-provincia');
+  Object.entries(PROVINCIAS).sort((a,b) => a[1].localeCompare(b[1])).forEach(([k, v]) => {
+    provSelect.innerHTML += `<option value="${k}">${v} (${k})</option>`;
+    fProv.innerHTML      += `<option value="${k}">${v} (${k})</option>`;
+  });
+
+  // Analista filter
+  const analSelect = qs('filter-analista');
+  ANALISTAS.forEach(a => {
+    analSelect.innerHTML += `<option value="${a.nombre}">${a.nombre}</option>`;
+  });
+
+  // Garantia filter
+  const garSelect = qs('filter-garantia');
+  garantias.forEach(g => { garSelect.innerHTML += `<option value="${g}">${g}</option>`; });
+
+  // Línea filter
+  const linSelect = qs('filter-linea');
+  lineas.forEach(l => { linSelect.innerHTML += `<option value="${l}">${l}</option>`; });
+
+  // Datalists
+  const garDl = qs('garantias-list');
+  garantias.forEach(g => { garDl.innerHTML += `<option value="${g}">`; });
+
+  const tecDl = qs('tecnicos-list');
+  tecnicos.forEach(t => { tecDl.innerHTML += `<option value="${t}">`; });
+
+  // Eventos de filtro
+  ['search-input','filter-status','filter-garantia','filter-linea','filter-analista','filter-provincia']
+    .forEach(id => {
+      const el = qs(id);
+      el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => { offset = 0; loadData(); });
+    });
+
+  loadData();
+}
+
+init();
+</script>
+</body>
+</html>
