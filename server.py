@@ -195,6 +195,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         if path == '/api/expedientes':       return self._create()
         if path == '/api/expedientes/bulk':  return self._bulk()
+        if path == '/api/carga':             return self._carga_crear()
 
         if path.startswith('/api/expedientes/') and path.endswith('/restaurar'):
             parts = path.split('/')
@@ -718,6 +719,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'monto_anual': monto_anual,
                 'por_mes':     lista,
             })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    def _carga_crear(self):
+        try:
+            d = self.read_body()
+            num_exp = (d.get('num_exp') or '').strip().upper()
+            if not num_exp:
+                return self.send_json({'error': 'num_exp es obligatorio'}, 400)
+            fields = ['num_exp', 'titular', 'provincia', 'monto', 'garantia',
+                      'linea_programatica', 'fecha_carga'] + self.CARGA_FIELDS
+            cols = [f for f in fields if f in d or f == 'num_exp']
+            vals = []
+            for f in cols:
+                if f == 'num_exp':
+                    vals.append(num_exp)
+                else:
+                    vals.append(d.get(f) or None)
+            placeholders = ','.join('?' * len(cols))
+            col_names = ','.join(cols)
+            with get_db() as conn:
+                cur = conn.execute(
+                    f"INSERT INTO expedientes ({col_names}) VALUES ({placeholders})",
+                    vals
+                )
+                row = conn.execute("SELECT * FROM expedientes WHERE id=?", (cur.lastrowid,)).fetchone()
+            self.send_json(dict(row), 201)
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 

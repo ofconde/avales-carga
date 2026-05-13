@@ -686,7 +686,8 @@ function buscarExp(val) {
     const rows = await res.json();
     const c    = qs('buscar-resultados');
     if (!rows.length) {
-      c.innerHTML = '<div class="text-muted small">Sin resultados. Podés crear un registro manual.</div>';
+      c.innerHTML = '<div class="text-muted small mb-2">Sin resultados.</div>' +
+        '<button class="btn btn-sm btn-outline-primary" onclick="crearManual()"><i class="bi bi-plus-circle me-1"></i>Crear registro manual</button>';
       return;
     }
     c.innerHTML = rows.map(r => `
@@ -706,6 +707,19 @@ async function seleccionarExp(id) {
   fillForm(data);
   qs('form-section').classList.remove('d-none');
   qs('btn-guardar').classList.remove('d-none');
+}
+
+function crearManual() {
+  qs('buscar-section').classList.add('d-none');
+  fillForm({});
+  qs('r-num_exp').removeAttribute('readonly');
+  qs('r-titular').removeAttribute('readonly');
+  qs('r-provincia').removeAttribute('readonly');
+  qs('r-monto').removeAttribute('readonly');
+  qs('r-garantia').removeAttribute('readonly');
+  qs('form-section').classList.remove('d-none');
+  qs('btn-guardar').classList.remove('d-none');
+  qs('r-num_exp').focus();
 }
 
 function showBuscar() {
@@ -752,13 +766,19 @@ function toggleMotivoLegal() {
 
 async function guardarRegistro() {
   const id = qs('reg-id').value;
-  if (!id) { showToast('No se seleccionó ningún expediente', false); return; }
 
   const payload = {
+    num_exp:                   qs('r-num_exp').value.trim(),
+    titular:                   qs('r-titular').value.trim(),
+    provincia:                 qs('r-provincia').value.trim(),
+    monto:                     qs('r-monto').value.trim(),
+    garantia:                  qs('r-garantia').value.trim(),
     cuit:                      qs('r-cuit').value.trim(),
     avalista:                  qs('r-avalista').value.trim(),
     estado_pei:                qs('r-estado_pei').value.trim(),
+    linea_programatica:        qs('r-linea_pei').value.trim(),
     linea_manual:              qs('r-linea_manual').value,
+    fecha_carga:               qs('r-fecha_carga').value || null,
     fecha_respuesta_uep:       qs('r-fecha_respuesta_uep').value || null,
     devolvio_legales:          qs('r-devolvio_legales').value,
     motivo_devolucion_legales: qs('r-motivo_devolucion_legales').value.trim(),
@@ -768,14 +788,27 @@ async function guardarRegistro() {
     tecnico:                   qs('r-tecnico').value.trim(),
   };
 
-  const res  = await fetch(`/api/carga/${id}`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload),
-  });
+  let res;
+  if (id) {
+    res = await fetch(`/api/carga/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+  } else {
+    if (!payload.num_exp) { showToast('El número de expediente es obligatorio', false); return; }
+    res = await fetch('/api/carga', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+  }
   const json = await res.json();
   if (json.error) { showToast(json.error, false); return; }
   showToast('Registro guardado correctamente.');
+  ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {
+    const el = qs(f); if (el) el.setAttribute('readonly', true);
+  });
   regModal.hide();
   loadMes();
 }
