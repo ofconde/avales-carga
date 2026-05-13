@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tablero de Carga — CFI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="carga.css">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark mb-0">
+  <div class="navbar-inner">
+    <div class="navbar-brand-wrap">
+      <img src="https://cfi.org.ar/assets/images/logo-old.svg?v1" alt="CFI" class="navbar-logo-img">
+      <div class="navbar-divider"></div>
+      <div>
+        <div class="navbar-title">Tablero de Carga</div>
+        <div class="navbar-subtitle">Solicitudes Ingresadas — Equipo de Carga</div>
+      </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <a href="/" class="btn btn-sm btn-outline-light">
+        <i class="bi bi-arrow-left"></i> Panel general
+      </a>
+      <button class="btn btn-sm btn-outline-light" onclick="openAnual()">
+        <i class="bi bi-bar-chart-line"></i> Anual
+      </button>
+      <button class="btn btn-sm btn-success" onclick="openRegistrar()">
+        <i class="bi bi-plus-lg"></i> Registrar expediente
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- Selector de período -->
+<div class="periodo-bar">
+  <div class="d-flex align-items-center gap-3">
+    <button class="btn btn-sm btn-link text-white p-0" onclick="prevMes()">
+      <i class="bi bi-chevron-left"></i>
+    </button>
+    <span class="periodo-label" id="periodo-label">Cargando…</span>
+    <button class="btn btn-sm btn-link text-white p-0" id="btn-next-mes" onclick="nextMes()">
+      <i class="bi bi-chevron-right"></i>
+    </button>
+    <span class="badge bg-success ms-2 d-none" id="badge-actual">MES ACTUAL</span>
+  </div>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm w-auto bg-transparent text-white border-white" id="sel-mes-historico" onchange="irAMes(this.value)">
+      <option value="">Ir a un mes…</option>
+    </select>
+  </div>
+</div>
+
+<div class="container-fluid px-4 mt-3">
+
+  <!-- Stats principales -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-2">
+      <div class="card stat-card stat-card--blue">
+        <div class="stat-icon"><i class="bi bi-inbox"></i></div>
+        <div class="stat-value" id="st-total">—</div>
+        <div class="stat-label">Solicitudes</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card stat-card stat-card--teal">
+        <div class="stat-icon"><i class="bi bi-currency-dollar"></i></div>
+        <div class="stat-value stat-value--sm" id="st-monto">—</div>
+        <div class="stat-label">Monto total</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card stat-card stat-card--purple">
+        <div class="stat-icon"><i class="bi bi-calculator"></i></div>
+        <div class="stat-value stat-value--sm" id="st-promedio">—</div>
+        <div class="stat-label">Promedio</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card stat-card stat-card--green">
+        <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
+        <div class="stat-value" id="st-paso-si">—</div>
+        <div class="stat-label">Pasaron carga</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card stat-card stat-card--orange">
+        <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+        <div class="stat-value" id="st-paso-no">—</div>
+        <div class="stat-label">Observados</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card stat-card stat-card--red">
+        <div class="stat-icon"><i class="bi bi-arrow-return-left"></i></div>
+        <div class="stat-value" id="st-legales">—</div>
+        <div class="stat-label">Dev. Legales</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini-stats: por provincia / línea / garantía -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="mini-stats-card">
+        <div class="mini-stats-title"><i class="bi bi-geo-alt"></i> Por Provincia</div>
+        <div id="by-provincia" class="mini-stats-list"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="mini-stats-card">
+        <div class="mini-stats-title"><i class="bi bi-tag"></i> Por Línea</div>
+        <div id="by-linea" class="mini-stats-list"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="mini-stats-card">
+        <div class="mini-stats-title"><i class="bi bi-shield"></i> Por Garantía</div>
+        <div id="by-garantia" class="mini-stats-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-bar mb-2">
+    <div class="filters-row-top">
+      <div class="input-group input-group-sm filters-search">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="f-search" placeholder="Buscar expediente, CUIT, titular…">
+      </div>
+      <select class="form-select form-select-sm" id="f-provincia">
+        <option value="">Provincia</option>
+      </select>
+      <select class="form-select form-select-sm" id="f-linea">
+        <option value="">Línea</option>
+      </select>
+      <select class="form-select form-select-sm" id="f-garantia">
+        <option value="">Garantía</option>
+      </select>
+      <select class="form-select form-select-sm" id="f-paso">
+        <option value="">Carga inicial</option>
+        <option value="SI">✓ Pasó</option>
+        <option value="NO">✗ Observado</option>
+      </select>
+      <select class="form-select form-select-sm" id="f-legales">
+        <option value="">Legales</option>
+        <option value="SI">Devolvió Legales</option>
+        <option value="NO">No devolvió</option>
+      </select>
+      <button class="btn-filter-clear" onclick="clearFilters()"><i class="bi bi-x-lg"></i></button>
+    </div>
+  </div>
+
+  <!-- Tabla principal -->
+  <div class="table-wrapper">
+    <table class="table table-hover table-sm align-middle carga-table" id="carga-table">
+      <thead>
+        <tr>
+          <th>F. Carga</th>
+          <th>Expediente</th>
+          <th>CUIT</th>
+          <th>Titular / Empresa</th>
+          <th>Prov.</th>
+          <th>Monto</th>
+          <th>Línea</th>
+          <th>Garantía</th>
+          <th>Pasó carga</th>
+          <th>Lo solicitado a UEP</th>
+          <th>Técnico UEP</th>
+          <th>F. Resp. UEP</th>
+          <th>Dev. Legales</th>
+          <th>Motivo Legal</th>
+          <th>Obs. Carga</th>
+          <th class="col-acciones">Acc.</th>
+        </tr>
+      </thead>
+      <tbody id="carga-tbody">
+        <tr><td colspan="16" class="text-center py-4 text-muted">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Paginación -->
+  <div class="d-flex justify-content-between align-items-center mt-2 mb-5">
+    <span class="text-muted small" id="pag-info"></span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" id="btn-prev" onclick="prevPage()">
+        <i class="bi bi-chevron-left"></i> Anterior
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" id="btn-next" onclick="nextPage()">
+        Siguiente <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     Modal: Registrar / Editar expediente
+═════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="regModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-carga text-white">
+        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> <span id="reg-modal-title">Registrar Expediente</span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Búsqueda (solo si es nuevo) -->
+        <div id="buscar-section">
+          <div class="alert alert-info py-2 mb-3">
+            <i class="bi bi-info-circle"></i> Buscá el expediente por número, CUIT o nombre de empresa para traer los datos automáticamente.
+          </div>
+          <div class="input-group mb-3">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="buscar-input"
+                   placeholder="Ej: 2026-CR-BA-001234 | 30-12345678-9 | EMPRESA S.A."
+                   oninput="buscarExp(this.value)">
+          </div>
+          <div id="buscar-resultados" class="mb-3"></div>
+        </div>
+
+        <!-- Formulario de datos -->
+        <div id="form-section" class="d-none">
+          <input type="hidden" id="reg-id">
+
+          <!-- Datos automáticos (de PEI / DB) -->
+          <div class="section-divider">
+            <span><i class="bi bi-database"></i> Datos del expediente</span>
+            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="showBuscar()">
+              <i class="bi bi-arrow-repeat"></i> Cambiar
+            </button>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">N° Expediente</label>
+              <input class="form-control form-control-sm" id="r-num_exp" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label form-label-sm">Titular / Empresa</label>
+              <input class="form-control form-control-sm" id="r-titular" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">CUIT <span class="text-muted">(editable)</span></label>
+              <input class="form-control form-control-sm" id="r-cuit" placeholder="30-12345678-9">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Provincia</label>
+              <input class="form-control form-control-sm" id="r-provincia" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">Monto solicitado</label>
+              <input class="form-control form-control-sm" id="r-monto" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">Garantía</label>
+              <input class="form-control form-control-sm" id="r-garantia" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">Avalista</label>
+              <input class="form-control form-control-sm" id="r-avalista"
+                     placeholder="Ej: FOGABA">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">Fecha de carga PEI</label>
+              <input class="form-control form-control-sm" id="r-fecha_carga" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label form-label-sm">Línea detectada (PEI)</label>
+              <input class="form-control form-control-sm" id="r-linea_pei" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label form-label-sm">Línea manual <span class="badge bg-warning text-dark">Corregir si es distinta</span></label>
+              <select class="form-select form-select-sm" id="r-linea_manual">
+                <option value="">— Sin corrección —</option>
+                <option>COMPETITIVIDAD PYME</option>
+                <option>FINANCIAMIENTO VERDE</option>
+                <option>DESARROLLO PRODUCTIVO Y FINANCIERO DE MUJERES</option>
+                <option>TRIPLE IMPACTO</option>
+                <option>DESARROLLO PRODUCTIVO</option>
+                <option>CADENA DE VALOR</option>
+                <option>EXPORTACION</option>
+                <option>ER-MICROEMPRESAS</option>
+                <option>OTRAS</option>
+                <option>SIN LÍNEA IDENTIFICADA</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label form-label-sm">Estado PEI</label>
+              <input class="form-control form-control-sm" id="r-estado_pei"
+                     placeholder="Ej: EN ANÁLISIS / APROBADO">
+            </div>
+          </div>
+
+          <!-- Campos de carga inicial -->
+          <div class="section-divider"><span><i class="bi bi-clipboard-check"></i> Carga inicial</span></div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">¿Pasó carga inicial? <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="r-paso_carga_inicial"
+                      onchange="toggleMotivoCarga()">
+                <option value="">— Seleccionar —</option>
+                <option value="SI">Sí</option>
+                <option value="NO">No</option>
+              </select>
+            </div>
+            <div class="col-md-9" id="motivo-carga-row">
+              <label class="form-label form-label-sm">Lo que se solicitó a la UEP (motivo observación)</label>
+              <input class="form-control form-control-sm" id="r-se_solicito"
+                     list="motivos-carga-dl"
+                     placeholder="Ej: FALTA NOTA PROVINCIAL">
+              <datalist id="motivos-carga-dl">
+                <option>Documentación incompleta</option>
+                <option>Error en monto solicitado</option>
+                <option>Error en garantía</option>
+                <option>Falta documentación respaldatoria</option>
+                <option>Inconsistencia en CUIT / titular</option>
+                <option>Error en línea</option>
+                <option>Error en localización</option>
+                <option>Falta nota provincial</option>
+                <option>Falta habilitaciones comerciales</option>
+                <option>Faltan datos de socios</option>
+              </datalist>
+            </div>
+          </div>
+
+          <!-- Técnico UEP y respuesta -->
+          <div class="section-divider"><span><i class="bi bi-person-lines-fill"></i> UEP</span></div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label form-label-sm">Técnico UEP que envió el expediente</label>
+              <input class="form-control form-control-sm" id="r-tecnico"
+                     list="tecnicos-uep-dl"
+                     placeholder="Nombre del técnico UEP">
+              <datalist id="tecnicos-uep-dl"></datalist>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">Fecha respuesta UEP</label>
+              <input type="date" class="form-control form-control-sm" id="r-fecha_respuesta_uep">
+            </div>
+          </div>
+
+          <!-- Devolución Legales -->
+          <div class="section-divider"><span><i class="bi bi-file-earmark-text"></i> Legales</span></div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">¿Devolvió Legales? <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="r-devolvio_legales"
+                      onchange="toggleMotivoLegal()">
+                <option value="">— Seleccionar —</option>
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+              </select>
+            </div>
+            <div class="col-md-9" id="motivo-legal-row" style="display:none">
+              <label class="form-label form-label-sm">Motivo de devolución de Legales</label>
+              <input class="form-control form-control-sm" id="r-motivo_devolucion_legales"
+                     list="motivos-legal-dl"
+                     placeholder="Ej: Falta firma">
+              <datalist id="motivos-legal-dl">
+                <option>Error en documentación legal</option>
+                <option>Falta firma</option>
+                <option>Error en datos societarios</option>
+                <option>Documentación vencida</option>
+                <option>Falta acreditación de personería</option>
+                <option>Inconsistencia en titularidad</option>
+                <option>Otro</option>
+              </datalist>
+            </div>
+          </div>
+
+          <!-- Observaciones internas -->
+          <div class="section-divider"><span><i class="bi bi-chat-left-text"></i> Observaciones internas de Carga</span></div>
+          <div class="row g-2">
+            <div class="col-12">
+              <textarea class="form-control form-control-sm" id="r-observaciones_carga" rows="2"
+                        placeholder="Notas operativas internas del equipo de Carga…"></textarea>
+            </div>
+          </div>
+        </div><!-- /form-section -->
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-primary d-none" id="btn-guardar" onclick="guardarRegistro()">
+          <i class="bi bi-floppy"></i> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     Modal: Estadísticas anuales
+═════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="anualModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bar-chart-line"></i> Estadísticas anuales</h5>
+        <div class="d-flex align-items-center gap-2 ms-3">
+          <select class="form-select form-select-sm w-auto" id="sel-year" onchange="loadAnual()">
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </select>
+        </div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="anual-body">
+        <p class="text-muted text-center">Cargando…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="toast" class="toast align-items-center text-white border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-msg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// ── Estado global ─────────────────────────────────────────────────────────────
+let PROVINCIAS = {};
+let MESES_DISPONIBLES = [];
+let mesCurrent = '';        // 'YYYY-MM'
+let mesActual  = '';        // mes real de hoy
+let offset     = 0;
+const LIMIT    = 150;
+let totalRows  = 0;
+let searchTimer = null;
+
+const MES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// ── Bootstrap instances ───────────────────────────────────────────────────────
+const regModal   = new bootstrap.Modal(document.getElementById('regModal'));
+const anualModal = new bootstrap.Modal(document.getElementById('anualModal'));
+const toastEl    = new bootstrap.Toast(document.getElementById('toast'), {delay: 3000});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(s) {
+  if (!s) return '—';
+  const p = s.slice(0,10).split('-');
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+function fmtMonto(n) {
+  if (!n || n === 0) return '—';
+  return '$ ' + Math.round(n).toLocaleString('es-AR');
+}
+
+function fmtMes(m) {
+  if (!m) return '';
+  const [y, mo] = m.split('-');
+  return `${MES_NOMBRES[parseInt(mo)-1]} ${y}`;
+}
+
+function showToast(msg, ok = true) {
+  const el = document.getElementById('toast');
+  el.className = `toast align-items-center text-white border-0 bg-${ok ? 'success' : 'danger'}`;
+  document.getElementById('toast-msg').textContent = msg;
+  toastEl.show();
+}
+
+function qs(id) { return document.getElementById(id); }
+
+function esc(s) {
+  if (s === null || s === undefined || s === '') return '—';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Período ───────────────────────────────────────────────────────────────────
+function hoyMes() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function prevMes() {
+  const [y,m] = mesCurrent.split('-').map(Number);
+  const d = new Date(y, m-2);
+  mesCurrent = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  offset = 0;
+  updatePeriodUI();
+  loadMes();
+}
+
+function nextMes() {
+  const [y,m] = mesCurrent.split('-').map(Number);
+  const d = new Date(y, m);
+  const next = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  if (next > mesActual) return;
+  mesCurrent = next;
+  offset = 0;
+  updatePeriodUI();
+  loadMes();
+}
+
+function irAMes(m) {
+  if (!m) return;
+  mesCurrent = m;
+  offset = 0;
+  updatePeriodUI();
+  loadMes();
+  qs('sel-mes-historico').value = '';
+}
+
+function updatePeriodUI() {
+  qs('periodo-label').textContent = fmtMes(mesCurrent);
+  qs('btn-next-mes').disabled = mesCurrent >= mesActual;
+  const badge = qs('badge-actual');
+  if (mesCurrent === mesActual) badge.classList.remove('d-none');
+  else badge.classList.add('d-none');
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────────
+function getFilters() {
+  return {
+    mes:      mesCurrent,
+    search:   qs('f-search').value.trim(),
+    provincia:qs('f-provincia').value,
+    linea:    qs('f-linea').value,
+    garantia: qs('f-garantia').value,
+    paso:     qs('f-paso').value,
+    legales:  qs('f-legales').value,
+  };
+}
+
+function buildQS(extra = {}) {
+  const f = {...getFilters(), ...extra};
+  return Object.entries(f).filter(([,v]) => v)
+    .map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+}
+
+function clearFilters() {
+  ['f-search','f-provincia','f-linea','f-garantia','f-paso','f-legales']
+    .forEach(id => { qs(id).value = ''; });
+  offset = 0;
+  loadMes();
+}
+
+// ── Carga de datos ────────────────────────────────────────────────────────────
+async function loadMes() {
+  const [dataRes, statsRes] = await Promise.all([
+    fetch(`/api/carga/mes?${buildQS({limit: LIMIT, offset})}`),
+    fetch(`/api/carga/stats?mes=${mesCurrent}`),
+  ]);
+  const data  = await dataRes.json();
+  const stats = await statsRes.json();
+
+  totalRows = data.total;
+  renderTable(data.data);
+  renderStats(stats);
+  renderMiniStats(stats);
+  renderPagination();
+}
+
+function renderStats(s) {
+  qs('st-total').textContent    = s.total ?? '—';
+  qs('st-monto').textContent    = fmtMonto(s.monto_total);
+  qs('st-promedio').textContent = fmtMonto(s.promedio);
+  qs('st-paso-si').textContent  = s.paso_si ?? '—';
+  qs('st-paso-no').textContent  = s.paso_no ?? '—';
+  qs('st-legales').textContent  = s.legales_si ?? '—';
+}
+
+function renderMiniStats(s) {
+  const maxProv = s.by_provincia?.[0]?.total || 1;
+  const maxLin  = s.by_linea?.[0]?.total || 1;
+  const maxGar  = s.by_garantia?.[0]?.total || 1;
+
+  function renderList(containerId, items, max) {
+    const c = qs(containerId);
+    if (!items?.length) { c.innerHTML = '<span class="text-muted small">Sin datos</span>'; return; }
+    c.innerHTML = items.slice(0,8).map(i => `
+      <div class="mini-stat-row">
+        <span class="mini-stat-label">${esc(i.grupo)}</span>
+        <div class="mini-stat-bar-wrap">
+          <div class="mini-stat-bar" style="width:${Math.round(100*i.total/max)}%"></div>
+        </div>
+        <span class="mini-stat-val">${i.total}</span>
+      </div>`).join('');
+  }
+  renderList('by-provincia', s.by_provincia, maxProv);
+  renderList('by-linea',     s.by_linea,     maxLin);
+  renderList('by-garantia',  s.by_garantia,  maxGar);
+}
+
+function renderTable(rows) {
+  const tbody = qs('carga-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">Sin solicitudes para este período</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const linea   = r.linea_manual || r.linea_programatica || '—';
+    const pasoBadge = r.paso_carga_inicial === 'SI'
+      ? '<span class="badge bg-success">SI</span>'
+      : r.paso_carga_inicial === 'NO'
+      ? '<span class="badge bg-danger">NO</span>'
+      : '<span class="badge bg-secondary">—</span>';
+    const legBadge = r.devolvio_legales === 'SI'
+      ? '<span class="badge bg-danger">SI</span>'
+      : r.devolvio_legales === 'NO'
+      ? '<span class="badge bg-light text-dark">NO</span>'
+      : '<span class="badge bg-secondary">—</span>';
+
+    return `<tr>
+      <td class="cell-date">${fmtDate(r.fecha_carga)}</td>
+      <td class="cell-exp"><span class="exp-num">${esc(r.num_exp)}</span></td>
+      <td class="cell-small">${esc(r.cuit)}</td>
+      <td class="cell-text">${esc(r.titular)}</td>
+      <td><span class="prov-badge" title="${PROVINCIAS[r.provincia]||''}">${r.provincia||'—'}</span></td>
+      <td class="cell-small text-end">${esc(r.monto)}</td>
+      <td class="cell-small">${esc(linea)}</td>
+      <td class="cell-small">${esc(r.garantia)}</td>
+      <td class="text-center">${pasoBadge}</td>
+      <td class="cell-obs">${esc(r.se_solicito)}</td>
+      <td class="cell-small">${esc(r.tecnico)}</td>
+      <td class="cell-date">${fmtDate(r.fecha_respuesta_uep)}</td>
+      <td class="text-center">${legBadge}</td>
+      <td class="cell-obs">${esc(r.motivo_devolucion_legales)}</td>
+      <td class="cell-obs">${esc(r.observaciones_carga)}</td>
+      <td class="col-acciones">
+        <button class="btn btn-xs btn-outline-primary" onclick="editarRegistro(${r.id})" title="Editar">
+          <i class="bi bi-pencil"></i>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPagination() {
+  const from = totalRows ? offset + 1 : 0;
+  const to   = Math.min(offset + LIMIT, totalRows);
+  qs('pag-info').textContent = totalRows
+    ? `Mostrando ${from}–${to} de ${totalRows} solicitudes`
+    : 'Sin resultados';
+  qs('btn-prev').disabled = offset === 0;
+  qs('btn-next').disabled = offset + LIMIT >= totalRows;
+}
+
+function prevPage() { offset = Math.max(0, offset - LIMIT); loadMes(); }
+function nextPage() { offset += LIMIT; loadMes(); }
+
+// ── Registro: búsqueda ────────────────────────────────────────────────────────
+function openRegistrar() {
+  qs('reg-modal-title').textContent = 'Registrar Expediente';
+  qs('buscar-section').classList.remove('d-none');
+  qs('form-section').classList.add('d-none');
+  qs('btn-guardar').classList.add('d-none');
+  qs('buscar-input').value = '';
+  qs('buscar-resultados').innerHTML = '';
+  regModal.show();
+  setTimeout(() => qs('buscar-input').focus(), 300);
+}
+
+async function editarRegistro(id) {
+  const res  = await fetch(`/api/expedientes/${id}`);
+  const data = await res.json();
+  qs('reg-modal-title').textContent = 'Editar Registro';
+  qs('buscar-section').classList.add('d-none');
+  fillForm(data);
+  qs('form-section').classList.remove('d-none');
+  qs('btn-guardar').classList.remove('d-none');
+  regModal.show();
+}
+
+function buscarExp(val) {
+  clearTimeout(searchTimer);
+  if (val.length < 2) { qs('buscar-resultados').innerHTML = ''; return; }
+  searchTimer = setTimeout(async () => {
+    const res  = await fetch(`/api/carga/buscar?q=${encodeURIComponent(val)}`);
+    const rows = await res.json();
+    const c    = qs('buscar-resultados');
+    if (!rows.length) {
+      c.innerHTML = '<div class="text-muted small">Sin resultados. Podés crear un registro manual.</div>';
+      return;
+    }
+    c.innerHTML = rows.map(r => `
+      <div class="buscar-item" onclick="seleccionarExp(${r.id})">
+        <strong>${r.num_exp}</strong>
+        <span class="text-muted ms-2">${r.titular||''}</span>
+        <span class="prov-badge ms-2">${r.provincia||''}</span>
+        <span class="text-muted ms-2 small">${fmtDate(r.fecha_carga)}</span>
+      </div>`).join('');
+  }, 300);
+}
+
+async function seleccionarExp(id) {
+  const res  = await fetch(`/api/expedientes/${id}`);
+  const data = await res.json();
+  qs('buscar-section').classList.add('d-none');
+  fillForm(data);
+  qs('form-section').classList.remove('d-none');
+  qs('btn-guardar').classList.remove('d-none');
+}
+
+function showBuscar() {
+  qs('buscar-section').classList.remove('d-none');
+  qs('form-section').classList.add('d-none');
+  qs('btn-guardar').classList.add('d-none');
+  qs('buscar-input').value = '';
+  qs('buscar-resultados').innerHTML = '';
+}
+
+function fillForm(d) {
+  qs('reg-id').value                  = d.id || '';
+  qs('r-num_exp').value               = d.num_exp || '';
+  qs('r-titular').value               = d.titular || '';
+  qs('r-cuit').value                  = d.cuit || '';
+  qs('r-provincia').value             = d.provincia || '';
+  qs('r-monto').value                 = d.monto || '';
+  qs('r-garantia').value              = d.garantia || '';
+  qs('r-avalista').value              = d.avalista || '';
+  qs('r-fecha_carga').value           = d.fecha_carga || '';
+  qs('r-linea_pei').value             = d.linea_programatica || '';
+  qs('r-linea_manual').value          = d.linea_manual || '';
+  qs('r-estado_pei').value            = d.estado_pei || '';
+  qs('r-paso_carga_inicial').value    = d.paso_carga_inicial || '';
+  qs('r-se_solicito').value           = d.se_solicito || '';
+  qs('r-tecnico').value               = d.tecnico || '';
+  qs('r-fecha_respuesta_uep').value   = d.fecha_respuesta_uep || '';
+  qs('r-devolvio_legales').value      = d.devolvio_legales || '';
+  qs('r-motivo_devolucion_legales').value = d.motivo_devolucion_legales || '';
+  qs('r-observaciones_carga').value   = d.observaciones_carga || '';
+  toggleMotivoCarga();
+  toggleMotivoLegal();
+}
+
+function toggleMotivoCarga() {
+  const val = qs('r-paso_carga_inicial').value;
+  qs('motivo-carga-row').style.display = (val === 'NO') ? '' : 'none';
+}
+
+function toggleMotivoLegal() {
+  const val = qs('r-devolvio_legales').value;
+  qs('motivo-legal-row').style.display = (val === 'SI') ? '' : 'none';
+}
+
+async function guardarRegistro() {
+  const id = qs('reg-id').value;
+  if (!id) { showToast('No se seleccionó ningún expediente', false); return; }
+
+  const payload = {
+    cuit:                      qs('r-cuit').value.trim(),
+    avalista:                  qs('r-avalista').value.trim(),
+    estado_pei:                qs('r-estado_pei').value.trim(),
+    linea_manual:              qs('r-linea_manual').value,
+    fecha_respuesta_uep:       qs('r-fecha_respuesta_uep').value || null,
+    devolvio_legales:          qs('r-devolvio_legales').value,
+    motivo_devolucion_legales: qs('r-motivo_devolucion_legales').value.trim(),
+    observaciones_carga:       qs('r-observaciones_carga').value.trim(),
+    paso_carga_inicial:        qs('r-paso_carga_inicial').value,
+    se_solicito:               qs('r-se_solicito').value.trim(),
+    tecnico:                   qs('r-tecnico').value.trim(),
+  };
+
+  const res  = await fetch(`/api/carga/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (json.error) { showToast(json.error, false); return; }
+  showToast('Registro guardado correctamente.');
+  regModal.hide();
+  loadMes();
+}
+
+// ── Estadísticas anuales ──────────────────────────────────────────────────────
+function openAnual() {
+  const year = new Date().getFullYear();
+  qs('sel-year').value = String(year);
+  anualModal.show();
+  loadAnual();
+}
+
+async function loadAnual() {
+  const year = qs('sel-year').value;
+  const res  = await fetch(`/api/carga/anual?year=${year}`);
+  const data = await res.json();
+
+  const maxTotal = Math.max(...(data.por_mes || []).map(m => m.total), 1);
+
+  qs('anual-body').innerHTML = `
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          <div class="fw-bold fs-4">${data.total_anual ?? 0}</div>
+          <div class="text-muted small">Total solicitudes ${year}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          <div class="fw-bold fs-5">${fmtMonto(data.monto_anual)}</div>
+          <div class="text-muted small">Monto total solicitado</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          <div class="fw-bold fs-5">${data.total_anual ? fmtMonto(data.monto_anual / data.total_anual) : '—'}</div>
+          <div class="text-muted small">Promedio por solicitud</div>
+        </div>
+      </div>
+    </div>
+    <h6 class="fw-semibold mb-2">Solicitudes por mes</h6>
+    <div class="anual-chart mb-4">
+      ${(data.por_mes || []).map(m => `
+        <div class="anual-bar-col">
+          <div class="anual-bar-wrap">
+            <div class="anual-bar" style="height:${Math.round(100*m.total/maxTotal)}%"
+                 title="${fmtMes(m.mes)}: ${m.total}"></div>
+          </div>
+          <div class="anual-bar-val">${m.total}</div>
+          <div class="anual-bar-label">${m.mes.slice(5)}</div>
+        </div>`).join('')}
+    </div>
+    <h6 class="fw-semibold mb-2">Detalle mensual</h6>
+    <table class="table table-sm table-bordered">
+      <thead class="table-light">
+        <tr><th>Mes</th><th class="text-end">Solicitudes</th><th class="text-end">Monto total</th><th class="text-end">Promedio</th></tr>
+      </thead>
+      <tbody>
+        ${(data.por_mes || []).map(m => `
+          <tr>
+            <td>${fmtMes(m.mes)}</td>
+            <td class="text-end">${m.total}</td>
+            <td class="text-end">${fmtMonto(m.monto_total)}</td>
+            <td class="text-end">${fmtMonto(m.total ? m.monto_total/m.total : 0)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Inicialización ────────────────────────────────────────────────────────────
+async function init() {
+  mesActual  = hoyMes();
+  mesCurrent = mesActual;
+
+  const [provRes, mesesRes, tecRes, garRes, linRes, provListRes] = await Promise.all([
+    fetch('/api/config/provincias'),
+    fetch('/api/carga/meses'),
+    fetch('/api/config/tecnicos'),
+    fetch('/api/config/garantias'),
+    fetch('/api/config/lineas'),
+    fetch('/api/config/provincias'),
+  ]);
+  PROVINCIAS = await provRes.json();
+  MESES_DISPONIBLES = await mesesRes.json();
+  const tecnicos  = await tecRes.json();
+  const garantias = await garRes.json();
+  const lineas    = await linRes.json();
+
+  // Selector histórico
+  const selH = qs('sel-mes-historico');
+  MESES_DISPONIBLES.forEach(m => {
+    selH.innerHTML += `<option value="${m.mes}">${fmtMes(m.mes)} (${m.total})</option>`;
+  });
+
+  // Filtro provincia
+  const fProv = qs('f-provincia');
+  Object.entries(PROVINCIAS).sort((a,b)=>a[1].localeCompare(b[1])).forEach(([k,v]) => {
+    fProv.innerHTML += `<option value="${k}">${v}</option>`;
+  });
+
+  // Filtro línea
+  const fLin = qs('f-linea');
+  lineas.forEach(l => { fLin.innerHTML += `<option value="${l}">${l}</option>`; });
+
+  // Filtro garantía
+  const fGar = qs('f-garantia');
+  garantias.forEach(g => { fGar.innerHTML += `<option value="${g}">${g}</option>`; });
+
+  // Datalist técnicos UEP
+  const dl = qs('tecnicos-uep-dl');
+  tecnicos.forEach(t => { dl.innerHTML += `<option value="${t}">`; });
+
+  // Eventos filtros
+  ['f-search','f-provincia','f-linea','f-garantia','f-paso','f-legales'].forEach(id => {
+    const el = qs(id);
+    el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => { offset = 0; loadMes(); });
+  });
+
+  updatePeriodUI();
+  loadMes();
+
+  // Inicializar año en modal anual con el año actual
+  qs('sel-year').value = String(new Date().getFullYear());
+}
+
+init();
+</script>
+</body>
+</html>

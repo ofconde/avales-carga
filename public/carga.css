@@ -1,0 +1,185 @@
+/* ── Período bar ─────────────────────────────────────────────────────────── */
+.periodo-bar {
+  background: #1a3a6b;
+  padding: .45rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255,255,255,.15);
+}
+.periodo-label {
+  color: #fff;
+  font-size: .95rem;
+  font-weight: 700;
+  min-width: 160px;
+  text-align: center;
+}
+.periodo-bar .form-select {
+  background-color: rgba(255,255,255,.15);
+  color: #fff;
+  border-color: rgba(255,255,255,.4);
+  font-size: .8rem;
+}
+.periodo-bar .form-select option { color: #000; background: #fff; }
+.periodo-bar .btn-link { color: #fff !important; opacity: .8; }
+.periodo-bar .btn-link:hover { opacity: 1; }
+
+/* ── Stat cards extra ────────────────────────────────────────────────────── */
+.stat-card--teal   { background: #0d6e6e; color: #fff; }
+.stat-card--purple { background: #5a3e8a; color: #fff; }
+.stat-card--red    { background: #8b1a1a; color: #fff; }
+
+.stat-value--sm {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* ── Mini-stats cards ────────────────────────────────────────────────────── */
+.mini-stats-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  height: 100%;
+}
+.mini-stats-title {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #666;
+  font-weight: 700;
+  margin-bottom: .5rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: .35rem;
+}
+.mini-stats-list { display: flex; flex-direction: column; gap: 4px; }
+.mini-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.mini-stat-label {
+  min-width: 90px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+.mini-stat-bar-wrap {
+  flex: 1;
+  background: #eef0f3;
+  border-radius: 3px;
+  height: 8px;
+  overflow: hidden;
+}
+.mini-stat-bar {
+  height: 100%;
+  background: #1a3a6b;
+  border-radius: 3px;
+  min-width: 4px;
+  transition: width .3s;
+}
+.mini-stat-val {
+  min-width: 28px;
+  text-align: right;
+  font-weight: 700;
+  color: #1a3a6b;
+  font-size: 11px;
+}
+
+/* ── Tabla de carga ──────────────────────────────────────────────────────── */
+.carga-table { font-size: 12px; }
+.carga-table thead th {
+  font-size: 10.5px;
+  padding: .4rem .45rem;
+}
+.carga-table tbody td { padding: .3rem .45rem; }
+
+.cell-obs {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #555;
+}
+
+/* ── Modal Registrar ─────────────────────────────────────────────────────── */
+.bg-carga { background: #1a3a6b; }
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 700;
+  color: #1a3a6b;
+  border-bottom: 2px solid #1a3a6b;
+  padding-bottom: 4px;
+  margin-bottom: .6rem;
+  margin-top: .5rem;
+}
+.section-divider:first-child { margin-top: 0; }
+
+.form-label-sm { font-size: .78rem; margin-bottom: .2rem; color: #444; }
+
+/* Búsqueda resultados */
+.buscar-item {
+  padding: .45rem .75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: background .15s;
+  font-size: .85rem;
+}
+.buscar-item:hover { background: #e8eef8; border-color: #1a3a6b; }
+
+/* ── Estadísticas anuales ────────────────────────────────────────────────── */
+.anual-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 140px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: .75rem .75rem 0;
+  overflow-x: auto;
+}
+.anual-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 42px;
+}
+.anual-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 0;
+}
+.anual-bar {
+  width: 100%;
+  background: #1a3a6b;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height .4s;
+}
+.anual-bar-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1a3a6b;
+  margin-top: 3px;
+}
+.anual-bar-label {
+  font-size: 9px;
+  color: #888;
+  margin-bottom: 4px;
+}
