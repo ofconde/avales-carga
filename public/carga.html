@@ -690,23 +690,41 @@ function buscarExp(val) {
         '<button class="btn btn-sm btn-outline-primary" onclick="crearManual()"><i class="bi bi-plus-circle me-1"></i>Crear registro manual</button>';
       return;
     }
-    c.innerHTML = rows.map(r => `
-      <div class="buscar-item" onclick="seleccionarExp(${r.id})">
+    // Guardar datos PEI en memoria temporal para selección
+    window._buscarRows = rows;
+    c.innerHTML = rows.map((r, i) => `
+      <div class="buscar-item" onclick="seleccionarRow(${i})">
         <strong>${r.num_exp}</strong>
         <span class="text-muted ms-2">${r.titular||''}</span>
         <span class="prov-badge ms-2">${r.provincia||''}</span>
-        <span class="text-muted ms-2 small">${fmtDate(r.fecha_carga)}</span>
+        ${r._pei ? '<span class="badge bg-success ms-2" style="font-size:10px">PEI</span>' : ''}
+        ${!r._pei ? `<span class="text-muted ms-2 small">${fmtDate(r.fecha_carga)}</span>` : ''}
       </div>`).join('');
   }, 300);
 }
 
-async function seleccionarExp(id) {
-  const res  = await fetch(`/api/expedientes/${id}`);
-  const data = await res.json();
-  qs('buscar-section').classList.add('d-none');
-  fillForm(data);
-  qs('form-section').classList.remove('d-none');
-  qs('btn-guardar').classList.remove('d-none');
+async function seleccionarRow(idx) {
+  const r = (window._buscarRows || [])[idx];
+  if (!r) return;
+  if (r._pei) {
+    // Viene de PEI: pre-llenar formulario con datos de avales, sin id
+    qs('buscar-section').classList.add('d-none');
+    fillForm(r);
+    // Campos base editables para que el técnico corrija si hace falta
+    ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {
+      const el = qs(f); if (el) el.removeAttribute('readonly');
+    });
+    qs('form-section').classList.remove('d-none');
+    qs('btn-guardar').classList.remove('d-none');
+  } else {
+    // Registro local: traer con id
+    const res  = await fetch(`/api/expedientes/${r.id}`);
+    const data = await res.json();
+    qs('buscar-section').classList.add('d-none');
+    fillForm(data);
+    qs('form-section').classList.remove('d-none');
+    qs('btn-guardar').classList.remove('d-none');
+  }
 }
 
 function crearManual() {

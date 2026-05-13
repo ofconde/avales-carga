@@ -7,6 +7,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 import urllib.parse
+import urllib.request
 
 BASE_DIR  = Path(__file__).parent
 _DATA_DIR = Path('/data') if Path('/data').exists() else BASE_DIR
@@ -672,11 +673,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
+    PEI_API = os.environ.get('PEI_API_URL', 'https://avalescfi.up.railway.app')
+
     def _carga_buscar(self, qs):
         try:
             q_str = (qs.get('q') or [''])[0].strip()
             if len(q_str) < 2:
                 return self.send_json([])
+
+            # Buscar en PEI (sistema avales)
+            results = []
+            try:
+                url = f"{self.PEI_API}/api/avales?search={urllib.parse.quote(q_str)}&limit=20"
+                req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read())
+                for r in data.get('data', []):
+                    results.append({
+                        'id':                None,
+                        'num_exp':           r.get('expediente', ''),
+                        'titular':           r.get('titulares', ''),
+                        'provincia':         r.get('provincia', ''),
+                        'monto':             r.get('monto', ''),
+                        'garantia':          r.get('garantia', ''),
+                        'nombre_proyecto':   r.get('nombre_proyecto', ''),
+                        'linea_programatica':r.get('linea_programatica', ''),
+                        'fecha_instruccion': r.get('fecha_instruccion', ''),
+                        'fecha_carga':       r.get('fecha_carga', ''),
+                        '_pei': True,
+                    })
+            except Exception:
+                pass  # si PEI no responde, seguir con DB local
+
+            # También buscar en DB local (expedientes ya registrados en carga)
             s = f"%{q_str}%"
             with get_db() as conn:
                 rows = conn.execute("""
@@ -685,7 +714,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                       AND (num_exp LIKE ? OR titular LIKE ? OR cuit LIKE ?)
                     ORDER BY fecha_carga DESC LIMIT 20
                 """, (s, s, s)).fetchall()
-            self.send_json([dict(r) for r in rows])
+
+            # Priorizar registros locales (ya tienen datos de carga)
+            local_nums = {dict(r)['num_exp'] for r in rows}
+            pei_only = [r for r in results if r['num_exp'] not in local_nums]
+
+            final = [dict(r) for r in rows] + pei_only
+            self.send_json(final[:25])
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
