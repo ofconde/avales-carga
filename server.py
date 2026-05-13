@@ -187,6 +187,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # ── API Tablero de Carga ────────────────────────────────────────────
         if path == '/api/carga/mes':              return self._carga_mes(qs)
         if path == '/api/carga/stats':            return self._carga_stats(qs)
+        if path == '/api/carga/stats_mensuales':  return self._carga_stats_mensuales(qs)
         if path == '/api/carga/anual':            return self._carga_anual(qs)
         if path == '/api/carga/meses':            return self._carga_meses()
         if path == '/api/carga/buscar':           return self._carga_buscar(qs)
@@ -724,6 +725,93 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'by_prov_monto': by_prov_monto,
                 'motivos_carga': [{'motivo': r[0], 'n': r[1]} for r in motivos],
                 'motivos_legales': [{'motivo': r[0], 'n': r[1]} for r in motivos_leg],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    REGIONES = {
+        'BA': 'Centro',     'CO': 'Centro',     'ER': 'Centro',     'SF': 'Centro',
+        'CA': 'NOA',        'JU': 'NOA',        'SA': 'NOA',        'TU': 'NOA',
+        'CT': 'NEA+SDE',    'FO': 'NEA+SDE',    'CH': 'NEA+SDE',    'MI': 'NEA+SDE',    'SE': 'NEA+SDE',
+        'CB': 'Patagonia',  'NQ': 'Patagonia',  'RN': 'Patagonia',  'SC': 'Patagonia',  'TF': 'Patagonia',
+        'LP': 'Cuyo+LP',    'LR': 'Cuyo+LP',    'MZ': 'Cuyo+LP',    'SJ': 'Cuyo+LP',    'SL': 'Cuyo+LP',
+    }
+
+    def _carga_stats_mensuales(self, qs):
+        try:
+            mes = (qs.get('mes') or [None])[0]
+            if not mes:
+                from datetime import date
+                mes = date.today().strftime('%Y-%m')
+
+            with get_db() as conn:
+                rows = conn.execute("""
+                    SELECT num_exp, monto, provincia,
+                           CASE WHEN linea_manual != '' THEN linea_manual ELSE linea_programatica END as linea,
+                           garantia
+                    FROM expedientes
+                    WHERE deleted_at IS NULL AND substr(fecha_carga,1,7) = ?
+                """, (mes,)).fetchall()
+
+            def is_usd(num_exp):
+                return (num_exp or '').startswith('2002-')
+
+            def prov_code_from_exp(num_exp):
+                s = num_exp or ''
+                return s[8:10] if len(s) >= 10 else ''
+
+            def agg_zero():
+                return {'total_ars': 0, 'monto_ars': 0.0, 'total_usd': 0, 'monto_usd': 0.0}
+
+            def inc(d, key, monto, usd):
+                if key not in d:
+                    d[key] = agg_zero()
+                if usd:
+                    d[key]['total_usd'] += 1
+                    d[key]['monto_usd'] += monto
+                else:
+                    d[key]['total_ars'] += 1
+                    d[key]['monto_ars'] += monto
+
+            resumen = agg_zero()
+            regiones = {}; provincias = {}; lineas = {}; garantias = {}
+
+            for r in rows:
+                num_exp  = r[0] or ''
+                monto    = parse_monto(r[1])
+                prov     = r[2] or ''
+                linea    = r[3] or ''
+                garantia = r[4] or ''
+                usd = is_usd(num_exp)
+
+                code   = prov_code_from_exp(num_exp)
+                region = self.REGIONES.get(code, prov or '(Sin región)')
+
+                if usd:
+                    resumen['total_usd'] += 1
+                    resumen['monto_usd'] += monto
+                else:
+                    resumen['total_ars'] += 1
+                    resumen['monto_ars'] += monto
+
+                inc(regiones,  region,                       monto, usd)
+                inc(provincias, prov or '(Sin provincia)',   monto, usd)
+                inc(lineas,    linea or '(Sin línea)',       monto, usd)
+                inc(garantias, garantia or '(Sin garantía)', monto, usd)
+
+            def to_list(d, key_name):
+                return sorted(
+                    [{key_name: k, **v} for k, v in d.items()],
+                    key=lambda x: -(x['total_ars'] + x['total_usd'])
+                )
+
+            self.send_json({
+                'mes':           mes,
+                'resumen':       resumen,
+                'por_region':    to_list(regiones,   'region'),
+                'por_provincia': to_list(provincias, 'provincia'),
+                'por_linea':     to_list(lineas,     'linea'),
+                'por_garantia':  to_list(garantias,  'garantia'),
             })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
