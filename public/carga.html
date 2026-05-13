@@ -757,7 +757,7 @@ function fillForm(d) {
   qs('r-monto').value                 = d.monto || '';
   qs('r-garantia').value              = d.garantia || '';
   qs('r-avalista').value              = d.avalista || '';
-  qs('r-fecha_carga').value           = d.fecha_carga || '';
+  qs('r-fecha_carga').value           = d.fecha_carga || new Date().toISOString().slice(0,10);
   qs('r-linea_pei').value             = d.linea_programatica || '';
   qs('r-linea_manual').value          = d.linea_manual || '';
   qs('r-estado_pei').value            = d.estado_pei || '';

@@ -533,8 +533,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         'cuit', 'avalista', 'estado_pei', 'linea_manual',
         'fecha_respuesta_uep', 'devolvio_legales',
         'motivo_devolucion_legales', 'observaciones_carga',
-        # campos base que el técnico también puede corregir desde carga:
         'paso_carga_inicial', 'se_solicito', 'tecnico',
+        'fecha_carga', 'titular', 'provincia', 'monto', 'garantia', 'linea_programatica',
     ]
 
     def _carga_mes(self, qs):
@@ -767,13 +767,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _carga_crear(self):
         try:
+            from datetime import date as _date
             d = self.read_body()
             num_exp = (d.get('num_exp') or '').strip().upper()
             if not num_exp:
                 return self.send_json({'error': 'num_exp es obligatorio'}, 400)
+            if not d.get('fecha_carga'):
+                d['fecha_carga'] = str(_date.today())
             fields = ['num_exp', 'titular', 'provincia', 'monto', 'garantia',
                       'linea_programatica', 'fecha_carga'] + self.CARGA_FIELDS
-            cols = [f for f in fields if f in d or f == 'num_exp']
+            seen = set(); unique_fields = []
+            for f in fields:
+                if f not in seen: seen.add(f); unique_fields.append(f)
+            cols = [f for f in unique_fields if f in d or f == 'num_exp']
             vals = []
             for f in cols:
                 if f == 'num_exp':
