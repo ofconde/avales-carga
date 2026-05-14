@@ -365,15 +365,6 @@ function render(mes, sm, stats, provMap) {
       <span>en ${r.total_usd} solicitud${r.total_usd > 1 ? 'es' : ''} &mdash; no incluidas en montos ARS.</span>
     </div>` : '<div style="margin-bottom:28px"></div>'}
 
-    ${(stats.paso_si != null) ? `
-    <div class="sh"><span class="sh-t">Observaciones de Carga</span><span class="sh-s">Estado operativo de las solicitudes ingresadas</span></div>
-    <div class="obs-grid">
-      <div class="obs-cell"><div class="obs-lbl">Pasaron carga inicial</div><div class="obs-val">${stats.paso_si ?? '—'}</div></div>
-      <div class="obs-cell"><div class="obs-lbl">Observados en carga</div><div class="obs-val">${stats.paso_no ?? '—'}</div></div>
-      <div class="obs-cell"><div class="obs-lbl">Devueltos por Legales</div><div class="obs-val">${stats.legales_si ?? '—'}</div></div>
-      <div class="obs-cell"><div class="obs-lbl">Pend. respuesta UEP</div><div class="obs-val">${stats.pend_uep ?? '—'}</div></div>
-    </div>` : ''}
-
     ${sm.por_provincia.length ? `
     <div class="sh"><span class="sh-t">Distribución por Provincia</span><span class="sh-s">01 &mdash; Cantidad y monto solicitado</span></div>
     <div class="prov-grid">${provHTML}</div>` : ''}
