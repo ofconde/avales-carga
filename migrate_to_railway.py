@@ -9,7 +9,7 @@ import urllib.request
 import sys
 from pathlib import Path
 
-RAILWAY_URL = "https://avales-carga-production.up.railway.app"
+RAILWAY_URL = "https://carga.up.railway.app"
 LOCAL_DB    = Path(__file__).parent / "carga.db"
 BATCH_SIZE  = 200
 
