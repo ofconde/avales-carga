@@ -433,31 +433,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({'error': str(e)}, 500)
 
     def _bulk(self):
+        """
+        Bulk import con todas las columnas via INSERT OR REPLACE.
+        Acepta registros activos y borrados (deleted_at).
+        Idempotente: se puede correr más de una vez.
+        """
         try:
             rows = self.read_body()
             if not isinstance(rows, list):
                 return self.send_json({'error': 'Se esperaba un array'}, 400)
 
-            ok = 0; skipped = 0; errors = []
+            ok = 0; errors = []
 
             with _db_write_lock:
                 conn = get_db()
                 try:
-                    existentes = set(
-                        r[0] for r in conn.execute("SELECT num_exp FROM expedientes").fetchall()
-                    )
                     for i, d in enumerate(rows):
                         exp = (d.get('num_exp') or '').strip().upper()
-                        if not exp or exp in existentes:
-                            skipped += 1; continue
+                        if not exp:
+                            continue
                         try:
                             conn.execute("""
-                                INSERT INTO expedientes
+                                INSERT OR REPLACE INTO expedientes
                                     (num_exp, fecha_instruccion, fecha_aval_recibido,
                                      fecha_tasacion_recibida, fecha_carga, titular, provincia,
                                      nombre_proyecto, linea_programatica, monto, garantia,
-                                     tec_de_carga, paso_carga_inicial, se_solicito, tecnico, observaciones)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                     tec_de_carga, paso_carga_inicial, se_solicito, tecnico,
+                                     observaciones, deleted_at, cuit, avalista, estado_pei,
+                                     linea_manual, fecha_respuesta_uep, devolvio_legales,
+                                     motivo_devolucion_legales, observaciones_carga)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                             """, (
                                 exp,
                                 d.get('fecha_instruccion') or None,
@@ -475,18 +480,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                 d.get('se_solicito', ''),
                                 d.get('tecnico', ''),
                                 d.get('observaciones', ''),
+                                d.get('deleted_at') or None,
+                                d.get('cuit', ''),
+                                d.get('avalista', ''),
+                                d.get('estado_pei', ''),
+                                d.get('linea_manual', ''),
+                                d.get('fecha_respuesta_uep') or None,
+                                d.get('devolvio_legales', ''),
+                                d.get('motivo_devolucion_legales', ''),
+                                d.get('observaciones_carga', ''),
                             ))
-                            existentes.add(exp)
                             ok += 1
                         except Exception as e:
-                            errors.append({'row': i + 2, 'msg': str(e)})
-                        if (ok + skipped) % 200 == 0:
+                            errors.append({'row': i + 1, 'msg': str(e)})
+                        if ok % 200 == 0:
                             conn.commit()
                     conn.commit()
                 finally:
                     conn.close()
 
-            self.send_json({'ok': True, 'importados': ok, 'omitidos': skipped, 'errores': errors})
+            self.send_json({'ok': True, 'importados': ok, 'omitidos': 0, 'errores': errors})
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
