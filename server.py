@@ -160,9 +160,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path   = parsed.path
         qs     = urllib.parse.parse_qs(parsed.query)
 
-        if path in ('/', '/index.html'):
-            return self.serve_file(PUBLIC_DIR / 'index.html')
-        if path in ('/carga', '/carga/'):
+        if path in ('/', '/carga', '/carga/'):
             return self.serve_file(PUBLIC_DIR / 'carga.html')
         if path in ('/informe-mensual', '/informe-mensual/'):
             return self.serve_file(PUBLIC_DIR / 'informe-mensual.html')
