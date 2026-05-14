@@ -749,7 +749,7 @@ function buscarExp(val) {
   clearTimeout(searchTimer);
   if (val.length < 2) { qs('buscar-resultados').innerHTML = ''; return; }
   searchTimer = setTimeout(async () => {
-    const res  = await fetch(`/api/carga/buscar?q=${encodeURIComponent(val)}`);
+    const res  = await fetch(`/api/carga/buscar?q=${encodeURIComponent(val)}&_t=${Date.now()}`);
     const rows = await res.json();
     const c    = qs('buscar-resultados');
     if (!rows.length) {

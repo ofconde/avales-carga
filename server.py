@@ -966,7 +966,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     'Accept': 'application/json',
                     'X-API-Key': self.PEI_API_KEY,
                 })
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=2) as resp:
                     data = json.loads(resp.read())
                 for r in data.get('data', []):
                     num = r.get('expediente', '')
