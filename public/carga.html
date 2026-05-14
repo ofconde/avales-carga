@@ -616,20 +616,35 @@ function clearFilters() {
   loadMes();
 }
 
+// ── Fetch con timeout — evita quedar colgado si el servidor no responde ──────
+function fetchSeguro(url, opts = {}, segundos = 15) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), segundos * 1000);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
 // ── Carga de datos ────────────────────────────────────────────────────────────
 async function loadMes() {
-  const [dataRes, statsRes] = await Promise.all([
-    fetch(`/api/carga/mes?${buildQS({limit: LIMIT, offset})}`),
-    fetch(`/api/carga/stats?mes=${mesCurrent}`),
-  ]);
-  const data  = await dataRes.json();
-  const stats = await statsRes.json();
+  try {
+    const [dataRes, statsRes] = await Promise.all([
+      fetchSeguro(`/api/carga/mes?${buildQS({limit: LIMIT, offset})}`),
+      fetchSeguro(`/api/carga/stats?mes=${mesCurrent}`),
+    ]);
+    const data  = await dataRes.json();
+    const stats = await statsRes.json();
 
-  totalRows = data.total;
-  renderTable(data.data);
-  renderStats(stats);
-  renderMiniStats(stats);
-  renderPagination();
+    totalRows = data.total;
+    renderTable(data.data);
+    renderStats(stats);
+    renderMiniStats(stats);
+    renderPagination();
+  } catch(e) {
+    const tbody = qs('tbody-expedientes');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="20" style="padding:24px;text-align:center;color:#dc2626;">
+      ⚠ No se pudo cargar. El servidor puede estar reiniciando.<br><br>
+      <button onclick="loadMes()" style="margin-right:8px;padding:6px 14px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">↺ Reintentar</button>
+    </td></tr>`;
+  }
 }
 
 function renderStats(s) {
@@ -1198,12 +1213,12 @@ async function init() {
   mesCurrent = mesActual;
 
   const [provRes, mesesRes, tecRes, garRes, linRes, tecCargaRes] = await Promise.all([
-    fetch('/api/config/provincias'),
-    fetch('/api/carga/meses'),
-    fetch('/api/config/tecnicos'),
-    fetch('/api/config/garantias'),
-    fetch('/api/config/lineas'),
-    fetch('/api/config/tecnicos_carga'),
+    fetchSeguro('/api/config/provincias', {}, 10),
+    fetchSeguro('/api/carga/meses', {}, 10),
+    fetchSeguro('/api/config/tecnicos', {}, 10),
+    fetchSeguro('/api/config/garantias', {}, 10),
+    fetchSeguro('/api/config/lineas', {}, 10),
+    fetchSeguro('/api/config/tecnicos_carga', {}, 10),
   ]);
   PROVINCIAS = await provRes.json();
   MESES_DISPONIBLES = await mesesRes.json();
