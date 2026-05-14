@@ -745,28 +745,73 @@ async function editarRegistro(id) {
   regModal.show();
 }
 
+let _lastBuscarQ = '';
+
 function buscarExp(val) {
   clearTimeout(searchTimer);
   if (val.length < 2) { qs('buscar-resultados').innerHTML = ''; return; }
-  searchTimer = setTimeout(async () => {
-    const res  = await fetch(`/api/carga/buscar?q=${encodeURIComponent(val)}&_t=${Date.now()}`);
-    const rows = await res.json();
-    const c    = qs('buscar-resultados');
-    if (!rows.length) {
-      c.innerHTML = '<div class="text-muted small mb-2">Sin resultados.</div>' +
-        '<button class="btn btn-sm btn-outline-primary" onclick="crearManual()"><i class="bi bi-plus-circle me-1"></i>Crear registro manual</button>';
+  _lastBuscarQ = val;
+  searchTimer = setTimeout(() => _ejecutarBusqueda(val, false), 300);
+}
+
+async function _ejecutarBusqueda(val, ampliada) {
+  const c = qs('buscar-resultados');
+  c.innerHTML = '<div class="text-muted small">Buscando…</div>';
+  try {
+    const url = `/api/carga/buscar?q=${encodeURIComponent(val)}&_t=${Date.now()}${ampliada ? '&ampliada=1' : ''}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    // Respuesta con sin_resultados (objeto con flag)
+    if (data && data.sin_resultados) {
+      const labelAmpliada = ampliada
+        ? ''
+        : `<button class="btn btn-sm btn-outline-secondary me-2" onclick="_ejecutarBusqueda('${val.replace(/'/g,"\\'")}', true)">
+             <i class="bi bi-search me-1"></i>Búsqueda ampliada en PEI
+           </button>`;
+      c.innerHTML = `
+        <div class="text-muted small mb-2">
+          No se encontró en la búsqueda${ampliada ? ' ampliada' : ''}.
+          ${data.pei_error ? `<span class="text-danger ms-1">(PEI no respondió)</span>` : ''}
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          ${labelAmpliada}
+          <button class="btn btn-sm btn-outline-primary" onclick="crearManual()">
+            <i class="bi bi-plus-circle me-1"></i>Cargar manualmente
+          </button>
+        </div>`;
       return;
     }
+
+    // Array normal de resultados
+    const rows = Array.isArray(data) ? data : [];
+    if (!rows.length) {
+      c.innerHTML = `
+        <div class="text-muted small mb-2">Sin resultados en la búsqueda rápida.</div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="_ejecutarBusqueda('${val.replace(/'/g,"\\'")}', true)">
+            <i class="bi bi-search me-1"></i>Búsqueda ampliada en PEI
+          </button>
+          <button class="btn btn-sm btn-outline-primary" onclick="crearManual()">
+            <i class="bi bi-plus-circle me-1"></i>Cargar manualmente
+          </button>
+        </div>`;
+      return;
+    }
+
     window._buscarRows = rows;
     c.innerHTML = rows.map((r, i) => `
       <div class="buscar-item" onclick="seleccionarRow(${i})">
         <strong>${r.num_exp}</strong>
         <span class="text-muted ms-2">${r.titular||''}</span>
         <span class="prov-badge ms-2">${r.provincia||''}</span>
-        ${r._pei ? '<span class="badge bg-success ms-2" style="font-size:10px">PEI</span>' : ''}
-        ${!r._pei ? `<span class="text-muted ms-2 small">${fmtDate(r.fecha_carga)}</span>` : ''}
+        ${r._pei || r._origen === 'pei'
+          ? '<span class="badge bg-success ms-2" style="font-size:10px">PEI</span>'
+          : `<span class="text-muted ms-2 small">${fmtDate(r.fecha_carga)}</span>`}
       </div>`).join('');
-  }, 300);
+  } catch(e) {
+    c.innerHTML = '<div class="text-danger small">Error de conexión. Intentá de nuevo.</div>';
+  }
 }
 
 async function seleccionarRow(idx) {
