@@ -9,7 +9,7 @@ import urllib.request
 import sys
 from pathlib import Path
 
-RAILWAY_URL = "https://avales-carga-production.up.railway.app"
+RAILWAY_URL = "https://carga.up.railway.app"
 LOCAL_DB    = Path(__file__).parent / "carga.db"
 BATCH_SIZE  = 200
 
@@ -43,7 +43,7 @@ def main():
     for i in range(0, total, BATCH_SIZE):
         batch = records[i:i + BATCH_SIZE]
         try:
-            res = post_json(f"{RAILWAY_URL}/api/bulk", batch)
+            res = post_json(f"{RAILWAY_URL}/api/expedientes/bulk", batch)
             imported += res.get("importados", 0)
             skipped  += res.get("omitidos", 0)
             print(f"  [{i+len(batch)}/{total}] importados={res.get('importados',0)}  omitidos={res.get('omitidos',0)}")
