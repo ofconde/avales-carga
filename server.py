@@ -164,6 +164,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.serve_file(PUBLIC_DIR / 'index.html')
         if path in ('/carga', '/carga/'):
             return self.serve_file(PUBLIC_DIR / 'carga.html')
+        if path in ('/informe-mensual', '/informe-mensual/'):
+            return self.serve_file(PUBLIC_DIR / 'informe-mensual.html')
         if not path.startswith('/api/'):
             fp = PUBLIC_DIR / path.lstrip('/')
             if fp.exists() and fp.is_file():

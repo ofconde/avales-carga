@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informe Mensual — CFI Carga</title>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: none !important; padding: 0 !important; }
+      .page { box-shadow: none !important; margin: 0 !important; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #F4F1EA;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; padding: 28px 16px;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .toolbar {
+      width: 740px; max-width: 100%;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px;
+    }
+    .btn-back { font-size: 12px; color: #888; text-decoration: none; }
+    .btn-back:hover { color: #444; }
+    .btn-print {
+      background: #15140F; color: #fff; border: none; border-radius: 4px;
+      padding: 7px 16px; font-size: 11px; font-weight: 600; cursor: pointer;
+      letter-spacing: 0.06em; display: flex; align-items: center; gap: 5px;
+    }
+    .btn-print:hover { background: #2e2d22; }
+    .page {
+      background: #fff; width: 740px; max-width: 100%;
+      padding: 40px 44px; box-shadow: 0 3px 24px rgba(0,0,0,0.14);
+    }
+
+    /* Header */
+    .rpt-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 22px;
+    }
+    .rpt-kicker {
+      font-size: 8.5px; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: #aaa;
+      display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+    }
+    .rpt-dot { width: 6px; height: 6px; border-radius: 50%; background: #c0392b; flex-shrink: 0; }
+    .rpt-title { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #15140F; }
+    .rpt-right { text-align: right; }
+    .rpt-period { font-size: 16px; font-weight: 700; color: #15140F; }
+    .rpt-meta { font-size: 9px; color: #bbb; line-height: 1.7; margin-top: 4px; }
+
+    /* Stats bar */
+    .stats-bar {
+      background: #15140F; padding: 17px 22px;
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      margin-bottom: 30px;
+    }
+    .sc {
+      padding: 0 18px;
+      border-right: 1px solid rgba(255,255,255,0.07);
+    }
+    .sc:first-child { padding-left: 0; }
+    .sc:last-child { border-right: none; }
+    .sc-lbl {
+      font-size: 7.5px; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: rgba(255,255,255,0.32); margin-bottom: 7px;
+    }
+    .sc-val {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.04em;
+      color: #D4A830; line-height: 1; margin-bottom: 5px;
+    }
+    .sc-val.wh { color: #fff; }
+    .sc-val.gr { color: #72C472; font-size: 18px; padding-top: 4px; }
+    .sc-sub { font-size: 8px; color: rgba(255,255,255,0.22); }
+
+    /* Section header */
+    .sh {
+      display: flex; justify-content: space-between; align-items: baseline;
+      border-bottom: 1.5px solid #15140F; padding-bottom: 5px; margin-bottom: 14px;
+    }
+    .sh-t { font-size: 10px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #15140F; }
+    .sh-s { font-size: 8.5px; color: #bbb; }
+
+    /* Province grid */
+    .prov-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      column-gap: 22px; row-gap: 6px; margin-bottom: 28px;
+    }
+    .prov-row { display: grid; grid-template-columns: 24px 1fr 26px 48px; align-items: center; gap: 5px; }
+    .prov-badge {
+      font-size: 8.5px; font-weight: 700; padding: 2px 3px; border-radius: 2px;
+      text-align: center; color: #fff; line-height: 1.3;
+    }
+    .prov-bg { height: 3.5px; background: #ede9e1; border-radius: 2px; overflow: hidden; }
+    .prov-fill { height: 100%; border-radius: 2px; }
+    .prov-n { font-size: 9.5px; font-weight: 600; color: #444; text-align: right; }
+    .prov-amt { font-size: 8px; color: #aaa; text-align: right; }
+
+    /* Lines section */
+    .lines-layout {
+      display: grid; grid-template-columns: 178px 1fr;
+      gap: 22px; margin-bottom: 28px; align-items: start;
+    }
+    .donut-col { display: flex; flex-direction: column; align-items: center; }
+    .legend { margin-top: 10px; width: 100%; }
+    .leg-row { display: flex; align-items: center; gap: 5px; font-size: 7.5px; color: #666; margin-bottom: 4px; }
+    .leg-sq { width: 8px; height: 8px; border-radius: 1px; flex-shrink: 0; }
+    .leg-pct { margin-left: auto; color: #bbb; }
+    .lines-tbl { width: 100%; border-collapse: collapse; font-size: 9px; }
+    .lines-tbl th {
+      font-size: 7.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      color: #bbb; padding: 0 6px 6px 0; text-align: right; border-bottom: 1px solid #eae6dd;
+    }
+    .lines-tbl th:first-child { text-align: left; }
+    .lines-tbl td { padding: 5px 6px 5px 0; border-top: 1px solid #f2ede4; text-align: right; color: #555; }
+    .lines-tbl td:first-child { text-align: left; color: #1a1a14; font-weight: 500; }
+    .lines-tbl .usd td { color: #2e7d32; }
+    .lines-tbl tfoot td { padding: 6px 6px 0 0; border-top: 1.5px solid #15140F; font-weight: 700; text-align: right; }
+    .lines-tbl tfoot td:first-child { text-align: left; }
+
+    /* Guarantee grid */
+    .gar-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: #e5e0d6; border: 1px solid #e5e0d6; margin-bottom: 28px;
+    }
+    .gar-cell {
+      background: #fff; padding: 7px 10px;
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      gap: 8px; align-items: center;
+    }
+    .gar-name { font-size: 8.5px; font-weight: 700; color: #15140F; }
+    .gar-name.top { color: #c0392b; }
+    .gar-n { font-size: 8.5px; font-weight: 600; color: #333; }
+    .gar-m { font-size: 8px; color: #aaa; }
+    .gar-p { font-size: 8px; color: #ccc; }
+
+    /* Region grid */
+    .region-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px; margin-bottom: 28px;
+    }
+    .region-cell { border: 1px solid #e5e0d6; padding: 10px 12px; background: #faf8f3; }
+    .reg-name { font-size: 7.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #999; margin-bottom: 6px; }
+    .reg-n { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; color: #15140F; margin-bottom: 1px; }
+    .reg-amt { font-size: 9px; color: #bbb; }
+    .reg-usd { font-size: 9px; color: #2e7d32; margin-top: 2px; }
+
+    /* Técnicos table */
+    .tec-tbl { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 28px; }
+    .tec-tbl th {
+      font-size: 7.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      color: #bbb; padding: 0 8px 6px 0; text-align: right; border-bottom: 1px solid #eae6dd;
+    }
+    .tec-tbl th:first-child { text-align: left; }
+    .tec-tbl td { padding: 6px 8px 6px 0; border-top: 1px solid #f2ede4; text-align: right; color: #555; }
+    .tec-tbl td:first-child { text-align: left; color: #1a1a14; font-weight: 500; }
+
+    /* Footer */
+    .rpt-footer {
+      margin-top: 24px; padding-top: 10px; border-top: 1px solid #e5e0d6;
+      display: flex; justify-content: space-between; font-size: 8px; color: #ccc;
+    }
+  </style>
+</head>
+<body>
+<div class="toolbar no-print">
+  <a href="/carga" class="btn-back">← Volver al tablero</a>
+  <button class="btn-print" onclick="window.print()">↓ Imprimir / Exportar PDF</button>
+</div>
+<div class="page" id="page">
+  <p style="text-align:center;padding:40px;color:#aaa">Cargando informe…</p>
+</div>
+
+<script>
+const DONUT_COLORS = [
+  '#1B3A1B','#2E5A2E','#3D7A3D','#5C9A4A','#7AB55A',
+  '#A0C870','#C8E090','#D8EAB0','#C9A830','#C0392B'
+];
+const PROV_COLORS = {
+  BA:'#B85450',CO:'#B85450',ER:'#B85450',SF:'#B85450',
+  CA:'#8B7355',JU:'#8B7355',SA:'#8B7355',TU:'#8B7355',
+  CT:'#4B7A9A',FO:'#4B7A9A',CH:'#4B7A9A',MI:'#4B7A9A',SE:'#4B7A9A',
+  CB:'#7A5B9A',NQ:'#7A5B9A',RN:'#7A5B9A',SC:'#7A5B9A',TF:'#7A5B9A',
+  LP:'#5A7A5A',LR:'#5A7A5A',MZ:'#5A7A5A',SJ:'#5A7A5A',SL:'#5A7A5A',
+};
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const ABREV = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function fmtMes(m) {
+  if (!m) return ''; const [y,mo] = m.split('-');
+  return `${MESES[parseInt(mo)-1]} ${y}`;
+}
+function fmtAbrev(m) {
+  if (!m) return ''; const [y,mo] = m.split('-');
+  return `${ABREV[parseInt(mo)-1]} ${y.slice(2)}`;
+}
+function fmtC(n) {
+  if (!n || n === 0) return '—';
+  if (n >= 1e9) return '$' + (n/1e9).toFixed(2).replace('.',',') + 'B';
+  if (n >= 1e6) return '$' + Math.round(n/1e6) + 'M';
+  if (n >= 1e3) return '$' + Math.round(n/1e3) + 'K';
+  return '$' + Math.round(n);
+}
+function fmtFull(n) {
+  if (!n || n === 0) return '—';
+  return '$ ' + Math.round(n).toLocaleString('es-AR');
+}
+function fmtUSD(n) {
+  if (!n || n === 0) return '—';
+  if (n >= 1e6) return 'U$S ' + (n/1e6).toFixed(1).replace('.',',') + 'M';
+  if (n >= 1e3) return 'U$S ' + Math.round(n/1e3) + 'K';
+  return 'U$S ' + Math.round(n).toLocaleString('es-AR');
+}
+function pct(a, t) { return t ? Math.round(100*a/t) + '%' : '0%'; }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function buildDonut(items, totalMonto) {
+  const cx=60, cy=60, r=44;
+  const C = 2 * Math.PI * r;
+  let ang = 0;
+  const circles = items.map((item, i) => {
+    const m = (item.monto_ars||0) + (item.monto_usd||0);
+    if (!m || !totalMonto) return '';
+    const frac = m / totalMonto;
+    const dash = frac * C;
+    const color = DONUT_COLORS[i % DONUT_COLORS.length];
+    const seg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${color}" stroke-width="18"
+      stroke-dasharray="${dash.toFixed(2)} ${(C - dash + 0.5).toFixed(2)}"
+      transform="rotate(${-90 + ang}, ${cx}, ${cy})"/>`;
+    ang += frac * 360;
+    return seg;
+  }).join('');
+  return `<svg width="120" height="120" viewBox="0 0 120 120">
+    ${circles}
+    <text x="60" y="56" text-anchor="middle" font-family="-apple-system,sans-serif"
+      font-size="11" font-weight="700" fill="#15140F">${fmtC(totalMonto)}</text>
+    <text x="60" y="68" text-anchor="middle" font-family="-apple-system,sans-serif"
+      font-size="7" fill="#bbb" letter-spacing="1">TOTAL</text>
+  </svg>`;
+}
+
+async function init() {
+  const mes = new URLSearchParams(location.search).get('mes')
+            || new Date().toISOString().slice(0,7);
+
+  const [smRes, stRes] = await Promise.all([
+    fetch(`/api/carga/stats_mensuales?mes=${mes}`),
+    fetch(`/api/carga/stats?mes=${mes}`),
+  ]);
+  const sm    = await smRes.json();
+  const stats = await stRes.json();
+
+  if (sm.error) {
+    document.getElementById('page').innerHTML =
+      `<p style="color:red;padding:40px">Error: ${sm.error}</p>`; return;
+  }
+  render(mes, sm, stats);
+}
+
+function render(mes, sm, stats) {
+  const r = sm.resumen;
+  const total = r.total_ars + r.total_usd;
+  const totalMonto = r.monto_ars + r.monto_usd;
+  const now = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const provsActivas = sm.por_provincia.filter(p => p.total_ars + p.total_usd > 0).length;
+
+  // ── Province grid ──────────────────────────────────────────────────────────
+  const maxProv = Math.max(1, ...sm.por_provincia.map(p => p.total_ars + p.total_usd));
+  const provHTML = sm.por_provincia.map(p => {
+    const n = p.total_ars + p.total_usd;
+    const code = (p.provincia||'??').slice(0,2).toUpperCase();
+    const color = PROV_COLORS[code] || '#888';
+    const barW = Math.round(100 * n / maxProv);
+    const barColor = p.total_usd > 0 && p.total_ars === 0 ? '#2e7d32' : '#2a2a1e';
+    const amt = p.total_usd > 0 && p.total_ars === 0 ? fmtUSD(p.monto_usd) : fmtC(p.monto_ars);
+    return `<div class="prov-row">
+      <span class="prov-badge" style="background:${color}">${esc(code)}</span>
+      <div class="prov-bg"><div class="prov-fill" style="width:${barW}%;background:${barColor}"></div></div>
+      <span class="prov-n">${n}</span>
+      <span class="prov-amt">${amt}</span>
+    </div>`;
+  }).join('');
+
+  // ── Lines section ──────────────────────────────────────────────────────────
+  const totalLineMonto = sm.por_linea.reduce((s,l) => s + (l.monto_ars||0) + (l.monto_usd||0), 0);
+  const donut = buildDonut(sm.por_linea, totalLineMonto);
+  const legendHTML = sm.por_linea.slice(0,8).map((l, i) => {
+    const m = (l.monto_ars||0) + (l.monto_usd||0);
+    const p = totalLineMonto ? Math.round(100*m/totalLineMonto) : 0;
+    if (!p) return '';
+    const short = l.linea.replace('PROGRAMATICA','PROG.').replace('PROGRAMÁTICA','PROG.')
+      .replace('COMPETITIVIDAD','COMP.').replace('TRIPLE IMPACTO','T.I.');
+    return `<div class="leg-row">
+      <span class="leg-sq" style="background:${DONUT_COLORS[i%DONUT_COLORS.length]}"></span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:104px" title="${esc(l.linea)}">${esc(short)}</span>
+      <span class="leg-pct">${p}%</span>
+    </div>`;
+  }).join('');
+  const lineRows = sm.por_linea.map(l => {
+    const m = (l.monto_ars||0) + (l.monto_usd||0);
+    const n = l.total_ars + l.total_usd;
+    const p = totalLineMonto ? Math.round(100*m/totalLineMonto) : 0;
+    const isUSD = l.total_usd > 0 && l.total_ars === 0;
+    return `<tr${isUSD ? ' class="usd"' : ''}>
+      <td>${esc(l.linea)}</td>
+      <td>${n}</td>
+      <td>${isUSD ? fmtUSD(l.monto_usd) : fmtC(l.monto_ars)}</td>
+      <td>${p}%</td>
+    </tr>`;
+  }).join('');
+
+  // ── Guarantee grid ─────────────────────────────────────────────────────────
+  const totalGar = sm.por_garantia.reduce((s,g) => s + g.total_ars + g.total_usd, 0);
+  const garHTML = sm.por_garantia.map((g, i) => {
+    const n = g.total_ars + g.total_usd;
+    const m = (g.monto_ars||0) + (g.monto_usd||0);
+    const p = totalGar ? Math.round(100*n/totalGar) : 0;
+    return `<div class="gar-cell">
+      <span class="gar-name${i < 3 ? ' top' : ''}">${esc(g.garantia)}</span>
+      <span class="gar-n">${n}</span>
+      <span class="gar-m">${fmtC(m)}</span>
+      <span class="gar-p">${p}%</span>
+    </div>`;
+  }).join('');
+
+  // ── Region grid ────────────────────────────────────────────────────────────
+  const regionHTML = sm.por_region.map(reg => {
+    const n = reg.total_ars + reg.total_usd;
+    return `<div class="region-cell">
+      <div class="reg-name">${esc(reg.region)}</div>
+      <div class="reg-n">${n}</div>
+      <div class="reg-amt">${fmtC(reg.monto_ars)}</div>
+      ${reg.total_usd > 0 ? `<div class="reg-usd">${fmtUSD(reg.monto_usd)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // ── Técnico table ──────────────────────────────────────────────────────────
+  const tecHTML = (stats.by_tec_detail||[]).map(t => `<tr>
+    <td>${esc(t.tec)}</td>
+    <td>${t.total}</td>
+    <td>${fmtC(t.monto_total)}</td>
+    <td>${fmtC(t.promedio)}</td>
+    <td>${t.paso_si??0}</td>
+    <td>${t.paso_no??0}</td>
+    <td>${t.legales_si??0}</td>
+  </tr>`).join('');
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  document.getElementById('page').innerHTML = `
+    <div class="rpt-header">
+      <div>
+        <div class="rpt-kicker"><span class="rpt-dot"></span>TABLERO DE CARGA CFI &middot; INFORME MENSUAL</div>
+        <div class="rpt-title">Informe Solicitudes &mdash; ${fmtMes(mes)}</div>
+      </div>
+      <div class="rpt-right">
+        <div class="rpt-period">${fmtAbrev(mes)}</div>
+        <div class="rpt-meta">Generado ${now}<br>Reporte interno</div>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="sc">
+        <div class="sc-lbl">Total Solicitudes</div>
+        <div class="sc-val wh">${total}</div>
+        <div class="sc-sub">${r.total_ars} ARS &middot; ${r.total_usd} USD</div>
+      </div>
+      <div class="sc">
+        <div class="sc-lbl">Monto ARS</div>
+        <div class="sc-val">${fmtC(r.monto_ars)}</div>
+        <div class="sc-sub">${fmtFull(r.monto_ars)}</div>
+      </div>
+      <div class="sc">
+        <div class="sc-lbl">Monto USD &mdash; Lín. 2002</div>
+        <div class="sc-val gr">${r.total_usd > 0 ? fmtUSD(r.monto_usd) : '&mdash;'}</div>
+        <div class="sc-sub">${r.total_usd} solicitudes en dólares</div>
+      </div>
+      <div class="sc">
+        <div class="sc-lbl">Provincias Activas</div>
+        <div class="sc-val wh">${provsActivas}<span style="font-size:14px;color:rgba(255,255,255,0.3);font-weight:400"> /24</span></div>
+        <div class="sc-sub">${24 - provsActivas} sin solicitudes</div>
+      </div>
+    </div>
+
+    ${sm.por_provincia.length ? `
+    <div class="sh"><span class="sh-t">Distribución por Provincia</span><span class="sh-s">01 &mdash; Cantidad y monto solicitado</span></div>
+    <div class="prov-grid">${provHTML}</div>` : ''}
+
+    ${sm.por_linea.length ? `
+    <div class="sh"><span class="sh-t">Líneas de Financiamiento</span><span class="sh-s">02 &mdash; Participación sobre monto</span></div>
+    <div class="lines-layout">
+      <div class="donut-col">
+        ${donut}
+        <div class="legend">${legendHTML}</div>
+      </div>
+      <table class="lines-tbl">
+        <thead><tr><th>Línea</th><th>Cant.</th><th>Monto</th><th>%</th></tr></thead>
+        <tbody>${lineRows}</tbody>
+        <tfoot><tr><td>Total</td><td>${total}</td><td>${fmtC(totalMonto)}</td><td>100%</td></tr></tfoot>
+      </table>
+    </div>` : ''}
+
+    ${sm.por_garantia.length ? `
+    <div class="sh"><span class="sh-t">Tipo de Garantía</span><span class="sh-s">03 &mdash; ${totalGar} operaciones &middot; 100%</span></div>
+    <div class="gar-grid">${garHTML}</div>` : ''}
+
+    ${sm.por_region.length ? `
+    <div class="sh"><span class="sh-t">Distribución por Región</span><span class="sh-s">04 &mdash; Centro / NOA / NEA+SDE / Patagonia / Cuyo+LP</span></div>
+    <div class="region-grid">${regionHTML}</div>` : ''}
+
+    ${tecHTML ? `
+    <div class="sh"><span class="sh-t">Por Técnico de Carga</span><span class="sh-s">05 &mdash; Rendimiento del equipo</span></div>
+    <table class="tec-tbl">
+      <thead><tr>
+        <th style="text-align:left">Técnico</th>
+        <th>Solicitudes</th><th>Monto total</th><th>Promedio</th>
+        <th>Pasó carga</th><th>Observados</th><th>Dev. legales</th>
+      </tr></thead>
+      <tbody>${tecHTML}</tbody>
+    </table>` : ''}
+
+    <div class="rpt-footer">
+      <span>Tablero de Carga &middot; CFI</span>
+      <span>P&aacute;g. 01 / 01</span>
+      <span>Generado ${now}</span>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
