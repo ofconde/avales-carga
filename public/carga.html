@@ -177,7 +177,6 @@
         <tr>
           <th>F. Carga PEI</th>
           <th>Expediente</th>
-          <th>CUIT</th>
           <th>Titular / Empresa</th>
           <th>Prov.</th>
           <th>Monto</th>
@@ -688,7 +687,6 @@ function renderTable(rows) {
     return `<tr>
       <td class="cell-date">${fmtDate(r.fecha_carga)}</td>
       <td class="cell-exp"><span class="exp-num">${esc(r.num_exp)}</span></td>
-      <td class="cell-small">${esc(r.cuit)}</td>
       <td class="cell-text">${esc(r.titular)}</td>
       <td><span class="prov-badge" title="${PROVINCIAS[r.provincia]||''}">${r.provincia||'—'}</span></td>
       <td class="cell-small text-end">${esc(r.monto)}</td>

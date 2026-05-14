@@ -82,6 +82,58 @@ def get_config():
     with open(CONFIG_PATH, encoding='utf-8') as f:
         return json.load(f)
 
+# ── Normalización de campos ────────────────────────────────────────────────────
+
+# Mapa de nombres completos de provincia → código
+_PROV_NOMBRE_A_CODIGO = {
+    'buenos aires':               'BA',
+    'buenos aires-gba':           'BA',
+    'buenos aires (gba)':         'BA',
+    'catamarca':                  'CA',
+    'chaco':                      'CH',
+    'chubut':                     'CB',
+    'córdoba':                    'CO',
+    'cordoba':                    'CO',
+    'corrientes':                 'CT',
+    'entre ríos':                 'ER',
+    'entre rios':                 'ER',
+    'formosa':                    'FO',
+    'jujuy':                      'JU',
+    'la pampa':                   'LP',
+    'la rioja':                   'LR',
+    'mendoza':                    'MZ',
+    'misiones':                   'MI',
+    'neuquén':                    'NQ',
+    'neuquen':                    'NQ',
+    'río negro':                  'RN',
+    'rio negro':                  'RN',
+    'salta':                      'SA',
+    'san juan':                   'SJ',
+    'san luis':                   'SL',
+    'santa cruz':                 'SC',
+    'santa fe':                   'SF',
+    'santiago del estero':        'SE',
+    'tierra del fuego':           'TF',
+    'tucumán':                    'TU',
+    'tucuman':                    'TU',
+}
+
+def _norm_provincia(v):
+    """Normaliza provincia: nombre completo → código, respeta códigos existentes."""
+    if not v:
+        return v
+    mapped = _PROV_NOMBRE_A_CODIGO.get(v.strip().lower())
+    return mapped if mapped else v.strip()
+
+def _norm_garantia(v):
+    """Normaliza garantía: uppercase + colapsa variantes CASFOG."""
+    if not v:
+        return v
+    v = v.strip().upper()
+    if v.startswith('CASFOG'):
+        return 'CASFOG'
+    return v
+
 # ── Helpers de monto ──────────────────────────────────────────────────────────
 import re as _re
 
@@ -172,6 +224,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # ── API expedientes (tablero general) ──────────────────────────────
         if path == '/api/expedientes':            return self._list(qs)
         if path == '/api/expedientes/papelera':   return self._papelera()
+        if path == '/api/admin/normalizar':       return self._normalizar_datos()
         if path == '/api/config/provincias':      return self._provincias()
         if path == '/api/config/analistas':       return self._analistas()
         if path == '/api/config/garantias':        return self._garantias()
@@ -339,11 +392,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         d.get('fecha_tasacion_recibida') or None,
                         d.get('fecha_carga') or None,
                         d.get('titular', ''),
-                        d.get('provincia', ''),
+                        _norm_provincia(d.get('provincia', '')),
                         d.get('nombre_proyecto', ''),
                         d.get('linea_programatica', ''),
                         d.get('monto', ''),
-                        d.get('garantia', ''),
+                        _norm_garantia(d.get('garantia', '')),
                         d.get('tec_de_carga', ''),
                         d.get('paso_carga_inicial', ''),
                         d.get('se_solicito', ''),
@@ -380,11 +433,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         d.get('fecha_tasacion_recibida') or None,
                         d.get('fecha_carga') or None,
                         d.get('titular', ''),
-                        d.get('provincia', ''),
+                        _norm_provincia(d.get('provincia', '')),
                         d.get('nombre_proyecto', ''),
                         d.get('linea_programatica', ''),
                         d.get('monto', ''),
-                        d.get('garantia', ''),
+                        _norm_garantia(d.get('garantia', '')),
                         d.get('tec_de_carga', ''),
                         d.get('paso_carga_inicial', ''),
                         d.get('se_solicito', ''),
@@ -498,6 +551,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     conn.close()
 
             self.send_json({'ok': True, 'importados': ok, 'omitidos': 0, 'errores': errors})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    def _normalizar_datos(self):
+        """Limpieza única: normaliza garantia y provincia en todos los registros existentes."""
+        try:
+            with _db_write_lock:
+                conn = get_db()
+                try:
+                    rows = conn.execute("SELECT id, garantia, provincia FROM expedientes").fetchall()
+                    updated = 0
+                    for r in rows:
+                        new_g = _norm_garantia(r['garantia'])
+                        new_p = _norm_provincia(r['provincia'])
+                        if new_g != r['garantia'] or new_p != r['provincia']:
+                            conn.execute(
+                                "UPDATE expedientes SET garantia=?, provincia=? WHERE id=?",
+                                (new_g, new_p, r['id'])
+                            )
+                            updated += 1
+                    conn.commit()
+                finally:
+                    conn.close()
+            self.send_json({'ok': True, 'actualizados': updated})
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
