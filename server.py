@@ -940,18 +940,72 @@ class Handler(http.server.BaseHTTPRequestHandler):
             '_pei': True,
         }
 
+    # URL de PostgreSQL compartido (mismo que Dashboard/UEP — solo lectura para buscar)
+    PG_URL = os.environ.get('DATABASE_URL', '').replace('postgres://', 'postgresql://', 1)
+
+    def _buscar_en_pei(self, q_str):
+        """Consulta directa a bandeja_pei_real en PostgreSQL. Rápido, sin HTTP."""
+        if not self.PG_URL:
+            return [], "DATABASE_URL no configurada"
+        try:
+            import psycopg2
+            import psycopg2.extras
+            patron = f"%{q_str}%"
+            with psycopg2.connect(self.PG_URL) as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT "denominacionSolicitud", "razonSocial", "cuit",
+                               "provincia", "importeSolicitado", "estadoExpediente",
+                               "entidadesAvalantes", "tiposContragarantia", "fechaSolicitud"
+                        FROM bandeja_pei_real
+                        WHERE "tipoDeLinea" = 'Crédito'
+                          AND (
+                            LOWER("razonSocial")              LIKE LOWER(%s)
+                            OR LOWER("denominacionSolicitud") LIKE LOWER(%s)
+                            OR LOWER(COALESCE("cuit",''))     LIKE LOWER(%s)
+                          )
+                        ORDER BY "denominacionSolicitud" DESC
+                        LIMIT 30
+                    """, (patron, patron, patron))
+                    rows = cur.fetchall()
+            result = []
+            for r in rows:
+                monto_raw = r.get('importeSolicitado')
+                monto = f"$ {int(monto_raw):,}".replace(',', '.') if monto_raw else ''
+                entidad = str(r.get('entidadesAvalantes') or '').strip()
+                tipo    = str(r.get('tiposContragarantia') or '').strip()
+                for pref in ['Garantia SGR / FPG — ', 'Garantia SGR / FPG',
+                             'Garantía SGR / FPG — ', 'Garantía SGR / FPG', 'Garantia ']:
+                    if tipo.startswith(pref):
+                        tipo = tipo[len(pref):]
+                        break
+                result.append({
+                    'num_exp':          r.get('denominacionSolicitud') or '',
+                    'titular':          r.get('razonSocial') or '',
+                    'cuit':             r.get('cuit') or '',
+                    'provincia':        r.get('provincia') or '',
+                    'monto':            monto,
+                    'garantia':         entidad or tipo,
+                    'estado_pei':       r.get('estadoExpediente') or '',
+                    'fecha_instruccion':(r.get('fechaSolicitud') or '')[:10],
+                    'fecha_carga':      (r.get('fechaSolicitud') or '')[:10],
+                    '_pei': True,
+                })
+            return result, None
+        except Exception as e:
+            return [], str(e)
+
     def _carga_buscar(self, qs):
         """
-        Búsqueda rápida: DB local + PEI vía endpoint dedicado /api/buscar-pei.
-        El endpoint hace la búsqueda SQL directamente en bandeja_pei_real —
-        rápido, sin traer todo el dataset ni hacer procesamiento de dataframes.
+        Búsqueda rápida: DB local SQLite + bandeja_pei_real PostgreSQL directo.
+        Sin llamadas HTTP intermedias — consulta SQL en < 1 segundo.
         """
         try:
             q_str = (qs.get('q') or [''])[0].strip()
             if len(q_str) < 2:
                 return self.send_json([])
 
-            # ── 1. Buscar en DB local ─────────────────────────────
+            # ── 1. Buscar en DB local (SQLite) ────────────────────
             s = f"%{q_str}%"
             with get_db() as conn:
                 rows = conn.execute("""
@@ -963,32 +1017,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             local = [dict(r) for r in rows]
             local_nums = {r['num_exp'] for r in local}
 
-            # ── 2. Buscar en PEI vía endpoint dedicado ────────────
-            # /api/buscar-pei hace el filtro directo en SQL — responde en < 1s.
-            pei_only  = []
-            pei_error = None
-            try:
-                url = f"{self.PEI_API}/api/buscar-pei?q={urllib.parse.quote(q_str)}"
-                req = urllib.request.Request(url, headers={
-                    'Accept': 'application/json',
-                    'X-API-Key': self.PEI_API_KEY,
-                })
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    data = json.loads(resp.read())
-
-                for r in (data if isinstance(data, list) else []):
-                    num = r.get('num_exp', '')
-                    if num and num not in local_nums:
-                        r['_origen'] = 'pei'
-                        pei_only.append(r)
-
-            except Exception as e:
-                pei_error = str(e)
+            # ── 2. Buscar en PEI (PostgreSQL directo) ─────────────
+            pei_only, pei_error = self._buscar_en_pei(q_str)
+            pei_only = [r for r in pei_only if r['num_exp'] not in local_nums]
 
             resultado = (local + pei_only)[:25]
 
-            # Si no encontró nada, incluir flag para que el frontend
-            # ofrezca carga manual
             if not resultado:
                 return self.send_json({
                     'results': [],
