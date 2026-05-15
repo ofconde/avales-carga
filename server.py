@@ -942,14 +942,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _carga_buscar(self, qs):
         """
-        Búsqueda rápida: DB local + PEI (top 500 filtrado localmente).
-        NOTA: el parámetro ?search= de PEI no filtra — devuelve siempre
-        todos los expedientes ordenados por número desc. Por eso traemos
-        un lote grande y filtramos aquí.
+        Búsqueda rápida: DB local + PEI vía endpoint dedicado /api/buscar-pei.
+        El endpoint hace la búsqueda SQL directamente en bandeja_pei_real —
+        rápido, sin traer todo el dataset ni hacer procesamiento de dataframes.
         """
         try:
             q_str = (qs.get('q') or [''])[0].strip()
-            ampliada = (qs.get('ampliada') or [''])[0] == '1'
             if len(q_str) < 2:
                 return self.send_json([])
 
@@ -965,40 +963,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             local = [dict(r) for r in rows]
             local_nums = {r['num_exp'] for r in local}
 
-            # ── 2. Buscar en PEI ──────────────────────────────────
-            # PEI ignora ?search= → traemos un lote y filtramos localmente.
-            # Ampliada: 2000 registros (cubre histórico completo).
-            # Normal:    500 registros (cubre todos los expedientes recientes).
-            pei_limit  = 2000 if ampliada else 500
-            pei_only   = []
-            pei_error  = None
+            # ── 2. Buscar en PEI vía endpoint dedicado ────────────
+            # /api/buscar-pei hace el filtro directo en SQL — responde en < 1s.
+            pei_only  = []
+            pei_error = None
             try:
-                url = f"{self.PEI_API}/api/avales?limit={pei_limit}"
+                url = f"{self.PEI_API}/api/buscar-pei?q={urllib.parse.quote(q_str)}"
                 req = urllib.request.Request(url, headers={
                     'Accept': 'application/json',
                     'X-API-Key': self.PEI_API_KEY,
                 })
-                timeout = 8 if ampliada else 4
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                with urllib.request.urlopen(req, timeout=8) as resp:
                     data = json.loads(resp.read())
 
-                q_lower = q_str.lower()
-                for r in data.get('data', []):
-                    num     = r.get('expediente', '') or r.get('denominacionSolicitud', '')
-                    razon   = (r.get('razonSocial',  '') or '').lower()
-                    cuit    = (r.get('cuit',          '') or '')
-                    empresa = (r.get('empresa',       '') or '').lower()
-
-                    match = (
-                        q_lower in num.lower()    or
-                        q_lower in razon          or
-                        q_lower in cuit           or
-                        q_lower in empresa
-                    )
-                    if match and num and num not in local_nums:
-                        row = self._pei_to_row(r)
-                        row['_origen'] = 'pei'
-                        pei_only.append(row)
+                for r in (data if isinstance(data, list) else []):
+                    num = r.get('num_exp', '')
+                    if num and num not in local_nums:
+                        r['_origen'] = 'pei'
+                        pei_only.append(r)
 
             except Exception as e:
                 pei_error = str(e)
@@ -1006,13 +988,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             resultado = (local + pei_only)[:25]
 
             # Si no encontró nada, incluir flag para que el frontend
-            # ofrezca búsqueda ampliada o carga manual
+            # ofrezca carga manual
             if not resultado:
                 return self.send_json({
                     'results': [],
                     'sin_resultados': True,
                     'pei_error': pei_error,
-                    'sugerencia': 'ampliada' if not ampliada else 'manual',
+                    'sugerencia': 'manual',
                 })
 
             self.send_json(resultado)
