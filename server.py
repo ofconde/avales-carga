@@ -716,13 +716,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _carga_stats(self, qs):
         try:
-            mes = (qs.get('mes') or [None])[0]
+            mes      = (qs.get('mes')      or [None])[0]
+            provincia = (qs.get('provincia') or [None])[0]
             if not mes:
                 from datetime import date
                 mes = date.today().strftime('%Y-%m')
 
             base = "FROM expedientes WHERE deleted_at IS NULL AND substr(fecha_carga,1,7) = ?"
             p    = [mes]
+
+            if provincia:
+                base += " AND provincia = ?"
+                p.append(provincia)
 
             def agg(conn, group_col):
                 rows = conn.execute(f"""
