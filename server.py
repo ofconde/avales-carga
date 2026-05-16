@@ -1202,12 +1202,20 @@ def _sync_bajas_pei():
         import psycopg2
         conn_pg = psycopg2.connect(PG_URL)
         cur = conn_pg.cursor()
+        # Solo num_exp donde TODAS las filas son Retirado/Cancelado.
+        # Si existe al menos una fila activa para el mismo num_exp, lo excluimos.
         cur.execute("""
             SELECT "denominacionSolicitud"
             FROM bandeja_pei_real
             WHERE "tipoDeLinea" = 'Crédito'
-              AND (LOWER("estadoExpediente") LIKE '%retir%'
-                OR LOWER("estadoExpediente") LIKE '%cancel%')
+              AND (LOWER(COALESCE("estadoExpediente",'')) LIKE '%retir%'
+                OR LOWER(COALESCE("estadoExpediente",'')) LIKE '%cancel%')
+            EXCEPT
+            SELECT "denominacionSolicitud"
+            FROM bandeja_pei_real
+            WHERE "tipoDeLinea" = 'Crédito'
+              AND LOWER(COALESCE("estadoExpediente",'')) NOT LIKE '%retir%'
+              AND LOWER(COALESCE("estadoExpediente",'')) NOT LIKE '%cancel%'
         """)
         retirados = {r[0] for r in cur.fetchall()}
         conn_pg.close()
