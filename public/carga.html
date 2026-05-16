@@ -483,6 +483,53 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     Modal: Notificación UEP
+═════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="notifModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title"><i class="bi bi-envelope-arrow-up"></i> Notificación UEP</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Copiá el texto y pegalo en un correo de Outlook dirigido a la UEP correspondiente.
+        </p>
+        <div class="mb-2">
+          <label class="form-label form-label-sm fw-semibold">Asunto</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm font-monospace" id="notif-asunto" readonly>
+            <button class="btn btn-outline-secondary" onclick="copiarCampo('notif-asunto')" title="Copiar asunto">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label form-label-sm fw-semibold">Cuerpo del correo</label>
+          <textarea class="form-control form-control-sm font-monospace" id="notif-cuerpo" rows="12" readonly
+                    style="white-space:pre; resize:none;"></textarea>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <button class="btn btn-primary" onclick="copiarTodo()">
+            <i class="bi bi-clipboard-check"></i> Copiar texto completo
+          </button>
+          <a id="notif-mailto" href="#" class="btn btn-outline-secondary" target="_blank">
+            <i class="bi bi-box-arrow-up-right"></i> Intentar abrir en correo
+          </a>
+          <span class="text-success small d-none" id="notif-copiar-msg">
+            <i class="bi bi-check2"></i> ¡Copiado!
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
   <div id="toast" class="toast align-items-center text-white border-0" role="alert">
@@ -515,6 +562,7 @@ const regModal   = new bootstrap.Modal(document.getElementById('regModal'));
 const anualModal = new bootstrap.Modal(document.getElementById('anualModal'));
 const adminModal = new bootstrap.Modal(document.getElementById('adminModal'));
 const statsModal = new bootstrap.Modal(document.getElementById('statsModal'));
+const notifModal = new bootstrap.Modal(document.getElementById('notifModal'));
 const toastEl    = new bootstrap.Toast(document.getElementById('toast'), {delay: 3000});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -912,6 +960,23 @@ function toggleMotivoLegal() {
   qs('motivo-legal-row').style.display = (val === 'SI') ? '' : 'none';
 }
 
+function copiarCampo(id) {
+  const el = qs(id);
+  navigator.clipboard.writeText(el.value || el.textContent || '').then(() => {
+    showToast('Copiado al portapapeles');
+  });
+}
+
+function copiarTodo() {
+  const asunto = qs('notif-asunto').value;
+  const cuerpo = qs('notif-cuerpo').value;
+  const texto  = `Asunto: ${asunto}\n\n${cuerpo}`;
+  navigator.clipboard.writeText(texto).then(() => {
+    qs('notif-copiar-msg').classList.remove('d-none');
+    setTimeout(() => qs('notif-copiar-msg').classList.add('d-none'), 3000);
+  });
+}
+
 function notificarUEP() {
   const numExp   = qs('r-num_exp').value.trim()   || 'Sin dato';
   const titular  = qs('r-titular').value.trim()    || 'Sin dato';
@@ -921,26 +986,24 @@ function notificarUEP() {
   const linea    = (qs('r-linea_manual').value || qs('r-linea_pei').value || '').trim() || 'Sin dato';
 
   const asunto = `Notificación de carga — ${numExp}`;
-  const cuerpo = [
-    'Estimados,',
-    '',
-    'Se informa que se procedió a la carga del expediente correspondiente a la siguiente solicitud:',
-    '',
-    `Empresa / titular: ${titular}`,
-    `CUIT: ${cuit}`,
-    `Expediente: ${numExp}`,
-    `Monto solicitado: ${monto}`,
-    `Tipo de garantía: ${garantia}`,
-    `Línea: ${linea}`,
-    '',
-    'Saludos cordiales.',
-  ].join('\r\n');
+  const cuerpo = `Estimados,
 
-  const a = document.createElement('a');
-  a.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+Se informa que se procedió a la carga del expediente correspondiente a la siguiente solicitud:
+
+Empresa / titular: ${titular}
+CUIT: ${cuit}
+Expediente: ${numExp}
+Monto solicitado: ${monto}
+Tipo de garantía: ${garantia}
+Línea: ${linea}
+
+Saludos cordiales.`;
+
+  qs('notif-asunto').textContent  = asunto;
+  qs('notif-cuerpo').textContent  = cuerpo;
+  qs('notif-mailto').href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+  qs('notif-copiar-msg').classList.add('d-none');
+  notifModal.show();
 }
 
 async function guardarRegistro() {
