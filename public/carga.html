@@ -936,7 +936,11 @@ function notificarUEP() {
     'Saludos cordiales.',
   ].join('\r\n');
 
-  window.location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+  const a = document.createElement('a');
+  a.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function guardarRegistro() {
