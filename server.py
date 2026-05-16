@@ -77,6 +77,12 @@ def init_db():
             WHERE UPPER(TRIM(paso_carga_inicial)) IN ('NO','N','NOT','0','FALSE')
               AND paso_carga_inicial NOT IN ('NO','')
         """)
+        # Normalizar tec_de_carga: apodos → nombres completos canónicos
+        for informal, canonico in _TECNICO_INFORMAL_MAP.items():
+            conn.execute(
+                "UPDATE expedientes SET tec_de_carga=? WHERE UPPER(TRIM(tec_de_carga))=UPPER(?)",
+                (canonico, informal)
+            )
         # Corregir provincia usando el código embebido en num_exp (fuente de verdad)
         # Ejemplo: 2025-CR-CO-001794 → CO (Córdoba), no CB (Chubut)
         rows_prov = conn.execute("SELECT id, num_exp, provincia FROM expedientes").fetchall()
@@ -124,6 +130,30 @@ _PROV_NOMBRE_A_CODIGO = {
     'tucumán':                    'TU',
     'tucuman':                    'TU',
 }
+
+# Mapa PEI "Apellido, Nombre" → nombre canónico en Carga
+_TECNICO_PEI_MAP = {
+    'garcía, maría josé':   'MARIA JOSE GARCIA',
+    'garcia, maria jose':   'MARIA JOSE GARCIA',
+    'carrion, gabriela':    'GABRIELA CARRION',
+    'lloveras, jimena':     'JIMENA LLOVERAS',
+    'tello, mauro':         'MAURO TELLO',
+    'conde, omar francisco':'OMAR CONDE',
+}
+
+# Mapa de apodos/nombres informales → nombre canónico para corregir históricos
+_TECNICO_INFORMAL_MAP = {
+    'majo':         'MARIA JOSE GARCIA',
+    'gaby':         'GABRIELA CARRION',
+    'jimena':       'JIMENA LLOVERAS',
+    'mauro':        'MAURO TELLO',
+    'omar':         'OMAR CONDE',
+}
+
+def _norm_tecnico_pei(nombre_pei):
+    """Convierte 'García, María José' (formato PEI) al nombre canónico de Carga."""
+    key = nombre_pei.strip().lower()
+    return _TECNICO_PEI_MAP.get(key, nombre_pei.strip())
 
 _CODIGOS_VALIDOS = set(_PROV_NOMBRE_A_CODIGO.values())
 
@@ -964,7 +994,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             'provincia':         r.get('provincia', ''),
             'monto':             monto,
             'garantia':          r.get('garantia_display', ''),
-            'linea_programatica':r.get('linea_normalizada', ''),
+            'linea_programatica':r.get('linea_normalizada', '') or r.get('linea', ''),
+            'tecnico':           _norm_tecnico_pei(r.get('nombreRepresentanteComercial', '') or ''),
             'estado_pei':        r.get('estadoExpediente', ''),
             'fecha_instruccion': (r.get('fechaSolicitud') or '')[:10],
             'fecha_carga':       (r.get('fechaSolicitud') or '')[:10],
@@ -987,7 +1018,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     cur.execute("""
                         SELECT "denominacionSolicitud", "razonSocial", "cuit",
                                "provincia", "importeSolicitado", "estadoExpediente",
-                               "entidadesAvalantes", "tiposContragarantia", "fechaSolicitud"
+                               "entidadesAvalantes", "tiposContragarantia", "fechaSolicitud",
+                               "linea", "nombreRepresentanteComercial"
                         FROM bandeja_pei_real
                         WHERE "tipoDeLinea" = 'Crédito'
                           AND (
@@ -1011,15 +1043,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         tipo = tipo[len(pref):]
                         break
                 result.append({
-                    'num_exp':          r.get('denominacionSolicitud') or '',
-                    'titular':          r.get('razonSocial') or '',
-                    'cuit':             r.get('cuit') or '',
-                    'provincia':        r.get('provincia') or '',
-                    'monto':            monto,
-                    'garantia':         entidad or tipo,
-                    'estado_pei':       r.get('estadoExpediente') or '',
-                    'fecha_instruccion':(r.get('fechaSolicitud') or '')[:10],
-                    'fecha_carga':      (r.get('fechaSolicitud') or '')[:10],
+                    'num_exp':           r.get('denominacionSolicitud') or '',
+                    'titular':           r.get('razonSocial') or '',
+                    'cuit':              r.get('cuit') or '',
+                    'provincia':         r.get('provincia') or '',
+                    'monto':             monto,
+                    'garantia':          entidad or tipo,
+                    'estado_pei':        r.get('estadoExpediente') or '',
+                    'linea_programatica':r.get('linea') or '',
+                    'tecnico':           _norm_tecnico_pei(r.get('nombreRepresentanteComercial') or ''),
+                    'fecha_instruccion': (r.get('fechaSolicitud') or '')[:10],
+                    'fecha_carga':       (r.get('fechaSolicitud') or '')[:10],
                     '_pei': True,
                 })
             return result, None
