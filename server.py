@@ -93,6 +93,14 @@ def init_db():
                 correct = _PROV_NOMBRE_A_CODIGO.get((r[2] or '').lower().strip(), '')
             if correct and r[2] != correct:
                 conn.execute("UPDATE expedientes SET provincia=? WHERE id=?", (correct, r[0]))
+        # Tabla de aprobados por director (agregada/actualizada via POST /api/aprobados-director)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS aprobados_director (
+                mes         TEXT PRIMARY KEY,
+                cantidad    INTEGER DEFAULT 0,
+                monto_total REAL    DEFAULT 0
+            )
+        """)
         # Normalizar garantías: aliases y variantes (CASFOG Serie*, GARANTIZAR, CUYO AVAL, etc.)
         rows_gar = conn.execute("SELECT id, garantia FROM expedientes").fetchall()
         for r in rows_gar:
@@ -318,6 +326,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/api/carga/anual':            return self._carga_anual(qs)
         if path == '/api/carga/meses':            return self._carga_meses()
         if path == '/api/carga/buscar':           return self._carga_buscar(qs)
+        if path == '/api/aprobados-director':     return self._get_aprobados()
 
         # ── Backup ─────────────────────────────────────────────────────────
         if path == '/api/backup/db':              return self._backup_db(qs)
@@ -330,6 +339,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/api/expedientes/bulk':       return self._bulk()
         if path == '/api/carga':                  return self._carga_crear()
         if path == '/api/config/tecnicos_carga':  return self._tecnicos_carga_post()
+        if path == '/api/aprobados-director':     return self._post_aprobados()
 
         if path.startswith('/api/expedientes/') and path.endswith('/restaurar'):
             parts = path.split('/')
@@ -1047,6 +1057,49 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json([{'mes': r[0], 'total': r[1]} for r in rows])
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
+
+    # ── Aprobados por director ─────────────────────────────────────────────────
+
+    def _get_aprobados(self):
+        """GET /api/aprobados-director — devuelve [{mes, cantidad, monto_total}] ordenado por mes."""
+        try:
+            with get_db() as conn:
+                rows = conn.execute(
+                    "SELECT mes, cantidad, monto_total FROM aprobados_director ORDER BY mes ASC"
+                ).fetchall()
+            self.send_json([{'mes': r[0], 'cantidad': r[1], 'monto_total': r[2]} for r in rows])
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    def _post_aprobados(self):
+        """POST /api/aprobados-director — recibe {key, data:[{mes, cantidad, monto_total}]},
+        valida la key, borra y recarga la tabla. Devuelve {ok: true, meses: N}."""
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(length))
+        except Exception:
+            return self.send_json({'error': 'JSON inválido'}, 400)
+
+        if body.get('key') != self.BACKUP_KEY:
+            self.send_response(403)
+            self.end_headers()
+            return
+
+        data = body.get('data', [])
+        if not isinstance(data, list):
+            return self.send_json({'error': 'data debe ser una lista'}, 400)
+
+        with _db_write_lock:
+            try:
+                with get_db() as conn:
+                    conn.execute("DELETE FROM aprobados_director")
+                    conn.executemany(
+                        "INSERT INTO aprobados_director (mes, cantidad, monto_total) VALUES (?,?,?)",
+                        [(r['mes'], r['cantidad'], r.get('monto_total', 0)) for r in data]
+                    )
+                self.send_json({'ok': True, 'meses': len(data)})
+            except Exception as e:
+                self.send_json({'error': str(e)}, 500)
 
     PEI_API     = os.environ.get('PEI_API_URL',  'https://recepcionavales.cfi.org.ar')
     PEI_API_KEY = os.environ.get('PEI_API_KEY',  'cfi-avales-sync-2026')
