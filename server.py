@@ -1152,10 +1152,77 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
+# ── Sync de bajas desde PEI (retirados/cancelados) ───────────────────────────
+
+PG_URL = os.environ.get('DATABASE_URL', '').replace('postgres://', 'postgresql://', 1)
+
+def _sync_bajas_pei():
+    """
+    Consulta bandeja_pei_real en PostgreSQL y soft-deleteea en SQLite local
+    los expedientes que PEI marcó como Retirado o Cancelado.
+    Corre al inicio y cada 30 minutos en background.
+    """
+    if not PG_URL:
+        return
+    try:
+        import psycopg2
+        conn_pg = psycopg2.connect(PG_URL)
+        cur = conn_pg.cursor()
+        cur.execute("""
+            SELECT "denominacionSolicitud"
+            FROM bandeja_pei_real
+            WHERE "tipoDeLinea" = 'Crédito'
+              AND (LOWER("estadoExpediente") LIKE '%retir%'
+                OR LOWER("estadoExpediente") LIKE '%cancel%')
+        """)
+        retirados = {r[0] for r in cur.fetchall()}
+        conn_pg.close()
+
+        if not retirados:
+            return
+
+        with _db_write_lock:
+            conn = get_db()
+            try:
+                # Buscar cuáles están activos en SQLite
+                placeholders = ','.join('?' * len(retirados))
+                activos = conn.execute(
+                    f"SELECT id, num_exp FROM expedientes WHERE num_exp IN ({placeholders}) AND deleted_at IS NULL",
+                    list(retirados)
+                ).fetchall()
+
+                if activos:
+                    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    for row in activos:
+                        conn.execute(
+                            "UPDATE expedientes SET deleted_at=? WHERE id=?",
+                            (ts, row['id'])
+                        )
+                    conn.commit()
+                    print(f"[sync-bajas] Soft-delete de {len(activos)} expedientes retirados en PEI: "
+                          f"{[r['num_exp'] for r in activos]}")
+                else:
+                    print(f"[sync-bajas] Sin expedientes activos que dar de baja (retirados PEI: {len(retirados)}).")
+            finally:
+                conn.close()
+    except Exception as e:
+        print(f"[sync-bajas] Error: {e}")
+
+
+def _loop_sync_bajas():
+    """Loop de fondo: sync de bajas cada 30 minutos."""
+    import time
+    _sync_bajas_pei()                    # primera corrida al arrancar
+    while True:
+        time.sleep(30 * 60)
+        _sync_bajas_pei()
+
+
 # ── Arranque ──────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
+    threading.Thread(target=_loop_sync_bajas, daemon=True).start()
     port = int(os.environ.get('PORT', 3001))
     server = http.server.ThreadingHTTPServer(('0.0.0.0', port), Handler)
     print(f"\n  Sistema de Carga de Expedientes CFI")
