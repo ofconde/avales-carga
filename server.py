@@ -88,8 +88,17 @@ def init_db():
         rows_prov = conn.execute("SELECT id, num_exp, provincia FROM expedientes").fetchall()
         for r in rows_prov:
             correct = _prov_from_num_exp(r[1])
+            if not correct:
+                # Fallback: mapear nombre completo → código
+                correct = _PROV_NOMBRE_A_CODIGO.get((r[2] or '').lower().strip(), '')
             if correct and r[2] != correct:
                 conn.execute("UPDATE expedientes SET provincia=? WHERE id=?", (correct, r[0]))
+        # Normalizar garantías: aliases y variantes (CASFOG Serie*, GARANTIZAR, CUYO AVAL, etc.)
+        rows_gar = conn.execute("SELECT id, garantia FROM expedientes").fetchall()
+        for r in rows_gar:
+            new_g = _norm_garantia(r[1])
+            if new_g != r[1]:
+                conn.execute("UPDATE expedientes SET garantia=? WHERE id=?", (new_g, r[0]))
 
 def get_config():
     with open(CONFIG_PATH, encoding='utf-8') as f:
@@ -181,14 +190,23 @@ def _norm_provincia(v, num_exp=None):
     mapped = _PROV_NOMBRE_A_CODIGO.get(v.strip().lower())
     return mapped if mapped else v.strip()
 
+_GARANTIA_ALIAS = {
+    # GARANTIZAR: cualquier variante → GARANTIZAR SGR
+    'GARANTIZAR':                 'GARANTIZAR SGR',
+    # CUYO AVAL: variantes → CUYO AVAL SGR
+    'CUYO AVAL':                  'CUYO AVAL SGR',
+    'CUYO AVAL FAE MENDOZA':      'CUYO AVAL SGR',
+    # Correcciones menores de capitalización ya manejadas por upper()
+}
+
 def _norm_garantia(v):
-    """Normaliza garantía: uppercase + colapsa variantes CASFOG."""
+    """Normaliza garantía: uppercase + colapsa variantes CASFOG / aliases."""
     if not v:
         return v
     v = v.strip().upper()
     if v.startswith('CASFOG'):
         return 'CASFOG'
-    return v
+    return _GARANTIA_ALIAS.get(v, v)
 
 # ── Helpers de monto ──────────────────────────────────────────────────────────
 import re as _re
@@ -732,26 +750,31 @@ class Handler(http.server.BaseHTTPRequestHandler):
             limit     = int((qs.get('limit') or [200])[0])
             offset    = int((qs.get('offset')or [0])[0])
 
-            if not mes:
-                from datetime import date
-                mes = date.today().strftime('%Y-%m')
-
-            q = "SELECT * FROM expedientes WHERE deleted_at IS NULL AND substr(fecha_carga,1,7) = ?"
-            p = [mes]
-
             tec      = (qs.get('tec')      or [None])[0]
             tec_uep  = (qs.get('tec_uep')  or [None])[0]
 
-            if provincia: q += " AND provincia = ?";          p.append(provincia)
-            if linea:     q += " AND (linea_programatica = ? OR linea_manual = ?)"; p += [linea, linea]
-            if garantia:  q += " AND garantia = ?";           p.append(garantia)
-            if paso:      q += " AND paso_carga_inicial = ?"; p.append(paso)
-            if legales:   q += " AND devolvio_legales = ?";   p.append(legales)
-            if tec:       q += " AND tec_de_carga = ?";       p.append(tec)
-            if tec_uep:   q += " AND tecnico LIKE ?";         p.append(f"%{tec_uep}%")
             if search:
+                # Búsqueda GLOBAL: sin filtro de mes ni provincia
+                q = "SELECT * FROM expedientes WHERE deleted_at IS NULL"
+                p = []
+                s = f"%{search}%"
                 q += " AND (num_exp LIKE ? OR titular LIKE ? OR cuit LIKE ?)"
-                s = f"%{search}%"; p += [s, s, s]
+                p += [s, s, s]
+            else:
+                if not mes:
+                    from datetime import date
+                    mes = date.today().strftime('%Y-%m')
+
+                q = "SELECT * FROM expedientes WHERE deleted_at IS NULL AND substr(fecha_carga,1,7) = ?"
+                p = [mes]
+
+                if provincia: q += " AND provincia = ?";          p.append(provincia)
+                if linea:     q += " AND (linea_programatica = ? OR linea_manual = ?)"; p += [linea, linea]
+                if garantia:  q += " AND garantia = ?";           p.append(garantia)
+                if paso:      q += " AND paso_carga_inicial = ?"; p.append(paso)
+                if legales:   q += " AND devolvio_legales = ?";   p.append(legales)
+                if tec:       q += " AND tec_de_carga = ?";       p.append(tec)
+                if tec_uep:   q += " AND tecnico LIKE ?";         p.append(f"%{tec_uep}%")
 
             total_q  = q.replace("SELECT *", "SELECT COUNT(*)", 1)
             data_q   = q + " ORDER BY fecha_carga DESC, id DESC LIMIT ? OFFSET ?"
