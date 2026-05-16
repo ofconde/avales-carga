@@ -497,26 +497,13 @@
         <p class="text-muted small mb-3">
           Copiá el texto y pegalo en un correo de Outlook dirigido a la UEP correspondiente.
         </p>
-        <div class="mb-2">
-          <label class="form-label form-label-sm fw-semibold">Asunto</label>
-          <div class="input-group input-group-sm">
-            <input type="text" class="form-control form-control-sm font-monospace" id="notif-asunto" readonly>
-            <button class="btn btn-outline-secondary" onclick="copiarCampo('notif-asunto')" title="Copiar asunto">
-              <i class="bi bi-clipboard"></i>
-            </button>
-          </div>
-        </div>
         <div class="mb-3">
-          <label class="form-label form-label-sm fw-semibold">Cuerpo del correo</label>
           <textarea class="form-control form-control-sm font-monospace" id="notif-cuerpo" rows="12" readonly
                     style="white-space:pre; resize:none;"></textarea>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
           <button class="btn btn-primary" onclick="copiarTodo()">
-            <i class="bi bi-clipboard-check"></i> Copiar texto completo
-          </button>
-          <button class="btn btn-outline-secondary" onclick="abrirMailto()">
-            <i class="bi bi-box-arrow-up-right"></i> Intentar abrir en correo
+            <i class="bi bi-clipboard-check"></i> Copiar texto
           </button>
           <span class="text-success small d-none" id="notif-copiar-msg">
             <i class="bi bi-check2"></i> ¡Copiado!
@@ -972,9 +959,7 @@ function copiarCampo(id) {
 }
 
 function copiarTodo() {
-  const asunto = qs('notif-asunto').value;
-  const cuerpo = qs('notif-cuerpo').value;
-  const texto  = `Asunto: ${asunto}\n\n${cuerpo}`;
+  const texto = qs('notif-cuerpo').value;
   navigator.clipboard.writeText(texto).then(() => {
     qs('notif-copiar-msg').classList.remove('d-none');
     setTimeout(() => qs('notif-copiar-msg').classList.add('d-none'), 3000);
@@ -1003,9 +988,7 @@ Línea: ${linea}
 
 Saludos cordiales.`;
 
-  qs('notif-asunto').value = asunto;
   qs('notif-cuerpo').value = cuerpo;
-  window._notifMailto = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
   qs('notif-copiar-msg').classList.add('d-none');
   notifModal.show();
 }
