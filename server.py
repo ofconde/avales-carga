@@ -77,6 +77,13 @@ def init_db():
             WHERE UPPER(TRIM(paso_carga_inicial)) IN ('NO','N','NOT','0','FALSE')
               AND paso_carga_inicial NOT IN ('NO','')
         """)
+        # Corregir provincia usando el código embebido en num_exp (fuente de verdad)
+        # Ejemplo: 2025-CR-CO-001794 → CO (Córdoba), no CB (Chubut)
+        rows_prov = conn.execute("SELECT id, num_exp, provincia FROM expedientes").fetchall()
+        for r in rows_prov:
+            correct = _prov_from_num_exp(r[1])
+            if correct and r[2] != correct:
+                conn.execute("UPDATE expedientes SET provincia=? WHERE id=?", (correct, r[0]))
 
 def get_config():
     with open(CONFIG_PATH, encoding='utf-8') as f:
@@ -118,8 +125,27 @@ _PROV_NOMBRE_A_CODIGO = {
     'tucuman':                    'TU',
 }
 
-def _norm_provincia(v):
-    """Normaliza provincia: nombre completo → código, respeta códigos existentes."""
+_CODIGOS_VALIDOS = set(_PROV_NOMBRE_A_CODIGO.values())
+
+def _prov_from_num_exp(num_exp):
+    """Extrae el código de provincia del número de expediente (YYYY-CR-XX-NNNNNN → XX)."""
+    s = (num_exp or '').strip().upper()
+    # Formato esperado: 2025-CR-CO-001794
+    parts = s.split('-')
+    if len(parts) >= 3:
+        code = parts[2]
+        if code in _CODIGOS_VALIDOS:
+            return code
+    return ''
+
+def _norm_provincia(v, num_exp=None):
+    """Normaliza provincia: prioriza el código extraído del num_exp (fuente de verdad),
+    luego intenta mapear el valor ingresado manualmente."""
+    # Fuente de verdad: código embebido en el número de expediente
+    if num_exp:
+        from_exp = _prov_from_num_exp(num_exp)
+        if from_exp:
+            return from_exp
     if not v:
         return v
     mapped = _PROV_NOMBRE_A_CODIGO.get(v.strip().lower())
@@ -392,7 +418,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         d.get('fecha_tasacion_recibida') or None,
                         d.get('fecha_carga') or None,
                         d.get('titular', ''),
-                        _norm_provincia(d.get('provincia', '')),
+                        _norm_provincia(d.get('provincia', ''), d.get('num_exp')),
                         d.get('nombre_proyecto', ''),
                         d.get('linea_programatica', ''),
                         d.get('monto', ''),
@@ -433,7 +459,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         d.get('fecha_tasacion_recibida') or None,
                         d.get('fecha_carga') or None,
                         d.get('titular', ''),
-                        _norm_provincia(d.get('provincia', '')),
+                        _norm_provincia(d.get('provincia', ''), d.get('num_exp')),
                         d.get('nombre_proyecto', ''),
                         d.get('linea_programatica', ''),
                         d.get('monto', ''),
@@ -521,7 +547,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                 d.get('fecha_tasacion_recibida') or None,
                                 d.get('fecha_carga') or None,
                                 d.get('titular', ''),
-                                d.get('provincia', ''),
+                                _norm_provincia(d.get('provincia', ''), exp),
                                 d.get('nombre_proyecto', ''),
                                 d.get('linea_programatica', ''),
                                 d.get('monto', ''),
@@ -555,16 +581,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({'error': str(e)}, 500)
 
     def _normalizar_datos(self):
-        """Limpieza única: normaliza garantia y provincia en todos los registros existentes."""
+        """Limpieza: normaliza garantia y provincia usando num_exp como fuente de verdad."""
         try:
             with _db_write_lock:
                 conn = get_db()
                 try:
-                    rows = conn.execute("SELECT id, garantia, provincia FROM expedientes").fetchall()
+                    rows = conn.execute("SELECT id, num_exp, garantia, provincia FROM expedientes").fetchall()
                     updated = 0
                     for r in rows:
                         new_g = _norm_garantia(r['garantia'])
-                        new_p = _norm_provincia(r['provincia'])
+                        new_p = _norm_provincia(r['provincia'], r['num_exp'])
                         if new_g != r['garantia'] or new_p != r['provincia']:
                             conn.execute(
                                 "UPDATE expedientes SET garantia=?, provincia=? WHERE id=?",
