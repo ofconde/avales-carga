@@ -347,6 +347,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = urllib.parse.urlparse(self.path).path
+        if path.startswith('/api/expedientes/') and path.endswith('/permanente'):
+            return self._eliminar_permanente(path.split('/')[-2])
         if path.startswith('/api/expedientes/'):
             return self._delete(path.split('/')[-1])
         self.send_response(404); self.end_headers()
@@ -535,6 +537,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 conn.execute(
                     "UPDATE expedientes SET deleted_at=datetime('now','localtime') WHERE id=?", (eid,)
                 )
+            self.send_json({'ok': True})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    def _eliminar_permanente(self, eid):
+        try:
+            with get_db() as conn:
+                conn.execute("DELETE FROM expedientes WHERE id=?", (eid,))
             self.send_json({'ok': True})
         except Exception as e:
             self.send_json({'error': str(e)}, 500)

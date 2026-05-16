@@ -406,6 +406,9 @@
         <button type="button" class="btn btn-sm btn-outline-info d-none" id="btn-notif-uep" onclick="notificarUEP()" title="Abrir Outlook con el correo de notificación a la UEP">
           <i class="bi bi-envelope-arrow-up"></i> NOTIFICACIÓN UEP
         </button>
+        <button type="button" class="btn btn-sm btn-outline-danger d-none" id="btn-eliminar-def" onclick="eliminarDefinitivamente()" title="Eliminar permanentemente este registro">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
         <button type="button" class="btn btn-sm btn-primary d-none" id="btn-guardar" onclick="guardarRegistro()">
           <i class="bi bi-floppy"></i> Guardar
         </button>
@@ -782,6 +785,7 @@ function openRegistrar() {
   qs('form-section').classList.add('d-none');
   qs('btn-guardar').classList.add('d-none');
   qs('btn-notif-uep').classList.add('d-none');
+  qs('btn-eliminar-def').classList.add('d-none');
   qs('buscar-input').value = '';
   qs('buscar-resultados').innerHTML = '';
   regModal.show();
@@ -797,6 +801,7 @@ async function editarRegistro(id) {
   qs('form-section').classList.remove('d-none');
   qs('btn-guardar').classList.remove('d-none');
   qs('btn-notif-uep').classList.remove('d-none');
+  qs('btn-eliminar-def').classList.remove('d-none');
   regModal.show();
 }
 
@@ -909,6 +914,7 @@ function showBuscar() {
   qs('form-section').classList.add('d-none');
   qs('btn-guardar').classList.add('d-none');
   qs('btn-notif-uep').classList.add('d-none');
+  qs('btn-eliminar-def').classList.add('d-none');
   qs('buscar-input').value = '';
   qs('buscar-resultados').innerHTML = '';
 }
@@ -991,6 +997,18 @@ Saludos cordiales.`;
   qs('notif-cuerpo').value = cuerpo;
   qs('notif-copiar-msg').classList.add('d-none');
   notifModal.show();
+}
+
+async function eliminarDefinitivamente() {
+  const id = qs('reg-id').value;
+  if (!id) return;
+  if (!confirm('¿Eliminar definitivamente este expediente? Esta acción no se puede deshacer.')) return;
+  const res  = await fetch(`/api/expedientes/${id}/permanente`, { method: 'DELETE' });
+  const json = await res.json();
+  if (json.error) { showToast(json.error, false); return; }
+  showToast('Expediente eliminado definitivamente.');
+  regModal.hide();
+  loadMes();
 }
 
 async function guardarRegistro() {
