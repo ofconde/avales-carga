@@ -917,7 +917,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         'BA': 'Centro',     'CO': 'Centro',     'ER': 'Centro',     'SF': 'Centro',
         'CA': 'NOA',        'JU': 'NOA',        'SA': 'NOA',        'TU': 'NOA',
         'CT': 'NEA+SDE',    'FO': 'NEA+SDE',    'CH': 'NEA+SDE',    'MI': 'NEA+SDE',    'SE': 'NEA+SDE',
-        'CB': 'Patagonia',  'NQ': 'Patagonia',  'RN': 'Patagonia',  'SC': 'Patagonia',  'TF': 'Patagonia',
+        'CB': 'Sur',        'NQ': 'Sur',        'RN': 'Sur',        'SC': 'Sur',        'TF': 'Sur',
         'LP': 'Cuyo+LP',    'LR': 'Cuyo+LP',    'MZ': 'Cuyo+LP',    'SJ': 'Cuyo+LP',    'SL': 'Cuyo+LP',
     }
 
