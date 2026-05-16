@@ -403,6 +403,9 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-outline-info d-none" id="btn-notif-uep" onclick="notificarUEP()" title="Abrir Outlook con el correo de notificación a la UEP">
+          <i class="bi bi-envelope-arrow-up"></i> NOTIFICACIÓN UEP
+        </button>
         <button type="button" class="btn btn-sm btn-primary d-none" id="btn-guardar" onclick="guardarRegistro()">
           <i class="bi bi-floppy"></i> Guardar
         </button>
@@ -743,6 +746,7 @@ function openRegistrar() {
   qs('buscar-section').classList.remove('d-none');
   qs('form-section').classList.add('d-none');
   qs('btn-guardar').classList.add('d-none');
+  qs('btn-notif-uep').classList.add('d-none');
   qs('buscar-input').value = '';
   qs('buscar-resultados').innerHTML = '';
   regModal.show();
@@ -757,6 +761,7 @@ async function editarRegistro(id) {
   fillForm(data);
   qs('form-section').classList.remove('d-none');
   qs('btn-guardar').classList.remove('d-none');
+  qs('btn-notif-uep').classList.remove('d-none');
   regModal.show();
 }
 
@@ -840,6 +845,7 @@ async function seleccionarRow(idx) {
     });
     qs('form-section').classList.remove('d-none');
     qs('btn-guardar').classList.remove('d-none');
+    qs('btn-notif-uep').classList.remove('d-none');
   } else {
     const res  = await fetch(`/api/expedientes/${r.id}`);
     const data = await res.json();
@@ -847,6 +853,7 @@ async function seleccionarRow(idx) {
     fillForm(data);
     qs('form-section').classList.remove('d-none');
     qs('btn-guardar').classList.remove('d-none');
+    qs('btn-notif-uep').classList.remove('d-none');
   }
 }
 
@@ -858,6 +865,7 @@ function crearManual() {
   });
   qs('form-section').classList.remove('d-none');
   qs('btn-guardar').classList.remove('d-none');
+  qs('btn-notif-uep').classList.remove('d-none');
   qs('r-num_exp').focus();
 }
 
@@ -865,6 +873,7 @@ function showBuscar() {
   qs('buscar-section').classList.remove('d-none');
   qs('form-section').classList.add('d-none');
   qs('btn-guardar').classList.add('d-none');
+  qs('btn-notif-uep').classList.add('d-none');
   qs('buscar-input').value = '';
   qs('buscar-resultados').innerHTML = '';
 }
@@ -901,6 +910,33 @@ function toggleMotivoCarga() {
 function toggleMotivoLegal() {
   const val = qs('r-devolvio_legales').value;
   qs('motivo-legal-row').style.display = (val === 'SI') ? '' : 'none';
+}
+
+function notificarUEP() {
+  const numExp   = qs('r-num_exp').value.trim()   || 'Sin dato';
+  const titular  = qs('r-titular').value.trim()    || 'Sin dato';
+  const cuit     = qs('r-cuit').value.trim()       || 'Sin dato';
+  const monto    = qs('r-monto').value.trim()      || 'Sin dato';
+  const garantia = qs('r-garantia').value.trim()   || 'Sin dato';
+  const linea    = (qs('r-linea_manual').value || qs('r-linea_pei').value || '').trim() || 'Sin dato';
+
+  const asunto = `Notificación de carga — ${numExp}`;
+  const cuerpo = [
+    'Estimados,',
+    '',
+    'Se informa que se procedió a la carga del expediente correspondiente a la siguiente solicitud:',
+    '',
+    `Empresa / titular: ${titular}`,
+    `CUIT: ${cuit}`,
+    `Expediente: ${numExp}`,
+    `Monto solicitado: ${monto}`,
+    `Tipo de garantía: ${garantia}`,
+    `Línea: ${linea}`,
+    '',
+    'Saludos cordiales.',
+  ].join('\r\n');
+
+  window.location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
 }
 
 async function guardarRegistro() {
