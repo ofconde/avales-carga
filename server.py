@@ -319,6 +319,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/api/carga/meses':            return self._carga_meses()
         if path == '/api/carga/buscar':           return self._carga_buscar(qs)
 
+        # ── Backup ─────────────────────────────────────────────────────────
+        if path == '/api/backup/db':              return self._backup_db(qs)
+
         self.send_response(404); self.end_headers()
 
     def do_POST(self):
@@ -997,6 +1000,38 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 'por_linea':     to_list(lineas,     'linea'),
                 'por_garantia':  to_list(garantias,  'garantia'),
             })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+
+    BACKUP_KEY = os.environ.get('BACKUP_SECRET', 'cfi-backup-2026')
+
+    def _backup_db(self, qs):
+        """Devuelve el archivo SQLite completo para backup externo."""
+        key = (qs.get('key') or [''])[0]
+        if key != self.BACKUP_KEY:
+            self.send_response(403)
+            self.end_headers()
+            return
+        try:
+            import shutil, tempfile
+            with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+                tmp_path = tmp.name
+            # Backup seguro via sqlite3 API
+            import sqlite3 as _sqlite3
+            src = _sqlite3.connect(str(DB_PATH))
+            dst = _sqlite3.connect(tmp_path)
+            src.backup(dst)
+            dst.close(); src.close()
+            with open(tmp_path, 'rb') as f:
+                data = f.read()
+            os.unlink(tmp_path)
+            fecha = datetime.now().strftime('%Y-%m-%d')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Disposition', f'attachment; filename="carga_backup_{fecha}.db"')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
 
