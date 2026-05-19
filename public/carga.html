@@ -23,6 +23,7 @@
       </div>
     </div>
     <div class="d-flex gap-2 align-items-center">
+      <span id="version-badge" style="font-size:11px;color:rgba(255,255,255,0.5);margin-right:4px;"></span>
       <button class="btn btn-sm btn-outline-light" onclick="openStats()">
         <i class="bi bi-pie-chart"></i> Estadísticas
       </button>
@@ -1375,6 +1376,11 @@ async function init() {
   loadMes();
 
   qs('sel-year').value = String(new Date().getFullYear());
+
+  fetch('/api/version').then(r=>r.json()).then(d=>{
+    const el = document.getElementById('version-badge');
+    if (el) el.textContent = 'v' + d.version;
+  }).catch(()=>{});
 }
 
 init();

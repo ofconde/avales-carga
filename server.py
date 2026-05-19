@@ -9,6 +9,8 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
+VERSION   = "1.1.0"
+
 BASE_DIR  = Path(__file__).parent
 _DATA_DIR = Path('/data') if Path('/data').exists() else BASE_DIR
 DB_PATH   = _DATA_DIR / 'carga.db'
@@ -304,6 +306,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.serve_file(fp)
 
         # ── API expedientes (tablero general) ──────────────────────────────
+        if path == '/api/version':                return self.send_json({"version": VERSION})
         if path == '/api/expedientes':            return self._list(qs)
         if path == '/api/expedientes/papelera':   return self._papelera()
         if path == '/api/admin/normalizar':       return self._normalizar_datos()
