@@ -800,7 +800,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if tec_uep:   q += " AND tecnico LIKE ?";         p.append(f"%{tec_uep}%")
 
             total_q  = q.replace("SELECT *", "SELECT COUNT(*)", 1)
-            data_q   = q + " ORDER BY num_exp DESC LIMIT ? OFFSET ?"
+            data_q   = q + " ORDER BY CAST(SUBSTR(num_exp, -6) AS INTEGER) DESC LIMIT ? OFFSET ?"
 
             with get_db() as conn:
                 total = conn.execute(total_q, p).fetchone()[0]
