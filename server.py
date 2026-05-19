@@ -424,7 +424,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             NO_REC = "(fecha_aval_recibido IS NULL OR fecha_aval_recibido = '')"
             cq = q.replace("SELECT *", "SELECT COUNT(*)", 1)
 
-            q_data = q + " ORDER BY CAST(SUBSTR(num_exp, -6) AS INTEGER) DESC LIMIT ? OFFSET ?"
+            q_data = q + " ORDER BY num_exp DESC LIMIT ? OFFSET ?"
 
             with get_db() as conn:
                 total      = conn.execute(cq, p).fetchone()[0]
