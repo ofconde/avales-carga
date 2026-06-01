@@ -9,7 +9,7 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
-VERSION   = "1.1.0"
+VERSION   = "1.1.2"
 
 BASE_DIR  = Path(__file__).parent
 _DATA_DIR = Path('/data') if Path('/data').exists() else BASE_DIR
@@ -217,6 +217,22 @@ def _norm_garantia(v):
     if v.startswith('CASFOG'):
         return 'CASFOG'
     return _GARANTIA_ALIAS.get(v, v)
+
+_LINEA_ALIAS = {
+    # Subprograma → línea madre (acordado con negocio)
+    'DESARROLLO PRODUCTIVO Y FINANCIERO DE MUJERES': 'MUJERES',
+    'VERDE':                                         'FINANCIAMIENTO VERDE',
+    'PROGRAMATICA':                                  'PROGRAMÁTICA',
+}
+
+def _norm_linea(v):
+    """Normaliza nombre de línea: uppercase, quita prefijo de año ('2025 - ')
+    y colapsa variantes equivalentes. Solo para presentación en el informe."""
+    if not v:
+        return v
+    v = v.strip().upper()
+    v = _re.sub(r'^\d{4}\s*-\s*', '', v)   # '2025 - Competitividad Pyme' → 'COMPETITIVIDAD PYME'
+    return _LINEA_ALIAS.get(v, v)
 
 # ── Helpers de monto ──────────────────────────────────────────────────────────
 import re as _re
@@ -963,7 +979,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         'BA': 'Centro',     'CO': 'Centro',     'ER': 'Centro',     'SF': 'Centro',
         'CA': 'NOA',        'JU': 'NOA',        'SA': 'NOA',        'TU': 'NOA',
         'CT': 'NEA+SDE',    'FO': 'NEA+SDE',    'CH': 'NEA+SDE',    'MI': 'NEA+SDE',    'SE': 'NEA+SDE',
-        'CB': 'Sur',        'NQ': 'Sur',        'RN': 'Sur',        'SC': 'Sur',        'TF': 'Sur',
+        'CB': 'Patagonia',  'NQ': 'Patagonia',  'RN': 'Patagonia',  'SC': 'Patagonia',  'TF': 'Patagonia',
         'LP': 'Cuyo+LP',    'LR': 'Cuyo+LP',    'MZ': 'Cuyo+LP',    'SJ': 'Cuyo+LP',    'SL': 'Cuyo+LP',
     }
 
@@ -1010,7 +1026,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 num_exp  = r[0] or ''
                 monto    = parse_monto(r[1])
                 prov     = r[2] or ''
-                linea    = r[3] or ''
+                linea    = _norm_linea(r[3] or '')
                 garantia = r[4] or ''
                 usd = is_usd(num_exp)
 
