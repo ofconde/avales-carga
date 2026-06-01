@@ -1055,6 +1055,14 @@ async function guardarRegistro() {
     });
   }
   const json = await res.json();
+  if (json.already_exists) {
+    const existing = json.existing;
+    if (confirm(`⚠️ ${json.error}\n\n¿Querés abrir el expediente existente para editarlo?`)) {
+      regModal.hide();
+      openRegistro(existing.id);
+    }
+    return;
+  }
   if (json.error) { showToast(json.error, false); return; }
   showToast('Registro guardado correctamente.');
   ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {

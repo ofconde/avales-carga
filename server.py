@@ -470,6 +470,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with _db_write_lock:
                 conn = get_db()
                 try:
+                    num_exp_norm = (d.get('num_exp') or '').strip().upper()
+                    # Verificar si ya existe antes de insertar
+                    existing = conn.execute(
+                        "SELECT * FROM expedientes WHERE num_exp=?", (num_exp_norm,)
+                    ).fetchone()
+                    if existing:
+                        conn.close()
+                        self.send_json({
+                            'error': f'El expediente {num_exp_norm} ya existe en el sistema.',
+                            'existing': dict(existing),
+                            'already_exists': True
+                        }, 409)
+                        return
                     cur = conn.execute("""
                         INSERT INTO expedientes
                             (num_exp, fecha_instruccion, fecha_aval_recibido, fecha_tasacion_recibida,
@@ -478,7 +491,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                              tecnico, observaciones)
                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """, (
-                        (d.get('num_exp') or '').strip().upper(),
+                        num_exp_norm,
                         d.get('fecha_instruccion') or None,
                         d.get('fecha_aval_recibido') or None,
                         d.get('fecha_tasacion_recibida') or None,
@@ -498,7 +511,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     row = conn.execute("SELECT * FROM expedientes WHERE id=?", (cur.lastrowid,)).fetchone()
                     conn.commit()
                 finally:
-                    conn.close()
+                    if conn:
+                        try: conn.close()
+                        except: pass
             self.send_json(dict(row))
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
