@@ -333,6 +333,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         # ── Backup ─────────────────────────────────────────────────────────
         if path == '/api/backup/db':              return self._backup_db(qs)
+        if path == '/api/debug/buscar':           return self._debug_buscar(qs)
 
         self.send_response(404); self.end_headers()
 
@@ -778,6 +779,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         'paso_carga_inicial', 'se_solicito', 'tecnico',
         'fecha_carga', 'titular', 'provincia', 'monto', 'garantia', 'linea_programatica',
     ]
+
+    def _debug_buscar(self, qs):
+        """Busca incluyendo borrados — para diagnóstico."""
+        try:
+            q = (qs.get('q') or [None])[0]
+            with get_db() as conn:
+                rows = conn.execute(
+                    "SELECT id, num_exp, titular, fecha_carga, deleted_at FROM expedientes "
+                    "WHERE num_exp LIKE ? OR titular LIKE ? OR cuit LIKE ?",
+                    (f"%{q}%", f"%{q}%", f"%{q}%")
+                ).fetchall()
+            self.send_json({"total": len(rows), "data": [dict(r) for r in rows]})
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
 
     def _carga_mes(self, qs):
         try:
