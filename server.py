@@ -4,12 +4,39 @@ import json
 import sqlite3
 import os
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 import urllib.parse
 import urllib.request
 
-VERSION   = "1.1.2"
+VERSION   = "1.2.0"
+
+# ── Credenciales PEI (para sync de garantías) ─────────────────────────────────
+_PEI_LOGIN_URL   = "https://pei-api.cfi.org.ar/usuarios/token"
+_PEI_BANDEJA_URL = "https://pei-api.cfi.org.ar/empresas/BandejaExpedientes"
+_PEI_CTRGAR_URL  = "https://pei-api.cfi.org.ar/expedientes/{id}/contragarantias"
+_PEI_EMAIL    = os.environ.get("PEI_EMAIL",    "oconde@cfi.org.ar")
+_PEI_PASSWORD = os.environ.get("PEI_PASSWORD", "Abr512381..")
+_PEI_NAME     = os.environ.get("PEI_NAME",     "Omar Conde")
+
+_pei_token_cache = {"token": None, "expires": 0}
+_pei_token_lock  = threading.Lock()
+
+def _get_pei_token():
+    """Devuelve un Bearer token válido del PEI, refrescando si venció (TTL 50 min)."""
+    with _pei_token_lock:
+        if _pei_token_cache["token"] and time.time() < _pei_token_cache["expires"]:
+            return _pei_token_cache["token"]
+        import requests
+        r = requests.post(_PEI_LOGIN_URL,
+                          json={"Email": _PEI_EMAIL, "Password": _PEI_PASSWORD, "DisplayName": _PEI_NAME},
+                          timeout=10)
+        r.raise_for_status()
+        tok = r.json()["accessToken"]
+        _pei_token_cache["token"]   = tok
+        _pei_token_cache["expires"] = time.time() + 50 * 60
+        return tok
 
 BASE_DIR  = Path(__file__).parent
 _DATA_DIR = Path('/data') if Path('/data').exists() else BASE_DIR
@@ -1430,11 +1457,104 @@ def _loop_sync_bajas():
         _sync_bajas_pei()
 
 
+def _sync_garantias_pei():
+    """
+    Completa la garantía de los expedientes locales que quedaron vacíos.
+
+    La bandeja del PEI a veces trae entidadesAvalantes=null en estados tempranos
+    (Legal, etc.) aunque la contragarantía ya exista. El módulo de carga copia ese
+    vacío a carga.db al cargar y no lo refresca. Este sync consulta el endpoint de
+    contragarantías (que sí tiene el dato real) y completa los vacíos.
+
+    Corre al inicio y cada 30 min en background. Idempotente y autocorrectivo.
+    """
+    if not _PEI_PASSWORD:
+        return
+    try:
+        import requests
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # 1. Expedientes locales sin garantía (excluye línea 2002 USD y borrados)
+        conn = get_db()
+        try:
+            pendientes = conn.execute("""
+                SELECT id, num_exp FROM expedientes
+                WHERE (garantia IS NULL OR TRIM(garantia) = '')
+                  AND deleted_at IS NULL
+                  AND num_exp NOT LIKE '2002-%'
+            """).fetchall()
+        finally:
+            conn.close()
+        if not pendientes:
+            print("[sync-garantias] Sin expedientes pendientes de garantía.")
+            return
+
+        # 2. Token + mapa denominacionSolicitud → idExpediente
+        token = _get_pei_token()
+        H = {"Authorization": f"Bearer {token}"}
+        bandeja = requests.get(_PEI_BANDEJA_URL, headers=H, timeout=30).json()
+        mapa = {e["denominacionSolicitud"].upper(): e["idExpediente"]
+                for e in bandeja if e.get("denominacionSolicitud") and e.get("idExpediente")}
+
+        # 3. Por cada vacío, buscar la entidad avalante en contragarantías
+        def _resolver(row):
+            idexp = mapa.get((row["num_exp"] or "").upper())
+            if not idexp:
+                return None
+            try:
+                cg = requests.get(_PEI_CTRGAR_URL.format(id=idexp), headers=H, timeout=8).json()
+            except Exception:
+                return None
+            # 1º: entidad avalante (SGR / fondo) — el caso más común
+            for item in cg:
+                entidad = (item.get("entidadAvalante") or "").strip()
+                if entidad:
+                    return (row["id"], _norm_garantia(entidad))
+            # 2º: sin avalante → garantía propia, usar el tipo (Hipoteca/Fianza/Prenda)
+            for item in cg:
+                tipo = (item.get("tipoContragarantia") or "").strip()
+                if tipo and "SGR" not in tipo.upper() and "FPG" not in tipo.upper():
+                    return (row["id"], _norm_garantia(tipo))
+            return None
+
+        resultados = []
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futuros = [pool.submit(_resolver, r) for r in pendientes]
+            for fut in as_completed(futuros):
+                res = fut.result()
+                if res:
+                    resultados.append(res)
+
+        # 4. Aplicar los completados
+        if resultados:
+            with _db_write_lock:
+                conn = get_db()
+                try:
+                    for eid, gar in resultados:
+                        conn.execute("UPDATE expedientes SET garantia=? WHERE id=?", (gar, eid))
+                    conn.commit()
+                finally:
+                    conn.close()
+        print(f"[sync-garantias] Completadas {len(resultados)} de {len(pendientes)} pendientes.")
+    except Exception as e:
+        print(f"[sync-garantias] Error: {e}")
+
+
+def _loop_sync_garantias():
+    """Loop de fondo: completa garantías vacías cada 30 minutos."""
+    import time
+    _sync_garantias_pei()                # primera corrida al arrancar
+    while True:
+        time.sleep(30 * 60)
+        _sync_garantias_pei()
+
+
 # ── Arranque ──────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
     threading.Thread(target=_loop_sync_bajas, daemon=True).start()
+    threading.Thread(target=_loop_sync_garantias, daemon=True).start()
     port = int(os.environ.get('PORT', 3001))
     server = http.server.ThreadingHTTPServer(('0.0.0.0', port), Handler)
     print(f"\n  Sistema de Carga de Expedientes CFI")
