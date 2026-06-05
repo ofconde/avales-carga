@@ -250,6 +250,13 @@ _LINEA_ALIAS = {
     'DESARROLLO PRODUCTIVO Y FINANCIERO DE MUJERES': 'MUJERES',
     'VERDE':                                         'FINANCIAMIENTO VERDE',
     'PROGRAMATICA':                                  'PROGRAMÁTICA',
+    # Variantes con/sin prefijo de año
+    'COMPETITIVIDAD PYME':                           'COMPETITIVIDAD PYME',
+    'COMPETITIVIDAD PYMIS':                          'COMPETITIVIDAD PYME',
+    'FINANCIAMIENTO VERDE':                          'FINANCIAMIENTO VERDE',
+    'DESARROLLO PRODUCTIVO':                         'DESARROLLO PRODUCTIVO',
+    'PROGRAMÁTICA':                                  'PROGRAMÁTICA',
+    'TRIPLE IMPACTO':                                'TRIPLE IMPACTO',
 }
 
 def _norm_linea(v):
@@ -928,9 +935,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 pend_uep = conn.execute(f"SELECT COUNT(*) {base} AND tecnico != '' AND (fecha_respuesta_uep IS NULL OR fecha_respuesta_uep='')", p).fetchone()[0]
 
                 by_prov    = agg(conn, 'provincia')
-                by_linea   = agg(conn, "CASE WHEN linea_manual != '' THEN linea_manual ELSE linea_programatica END")
+                by_linea_raw = agg(conn, "CASE WHEN linea_manual != '' THEN linea_manual ELSE linea_programatica END")
                 by_garantia= agg(conn, 'garantia')
                 by_tec     = agg(conn, 'tec_de_carga')
+
+                # Normalizar líneas y agrupar duplicados
+                lineas_norm = {}
+                for item in by_linea_raw:
+                    normalized = _norm_linea(item['grupo'])
+                    if normalized in lineas_norm:
+                        lineas_norm[normalized] += item['total']
+                    else:
+                        lineas_norm[normalized] = item['total']
+                by_linea = sorted([{'grupo': k, 'total': v} for k, v in lineas_norm.items()],
+                                  key=lambda x: -x['total'])
 
                 # Stats detalladas por técnico de carga
                 tec_detail = conn.execute(f"""
