@@ -560,6 +560,24 @@ const notifModal = new bootstrap.Modal(document.getElementById('notifModal'));
 const toastEl    = new bootstrap.Toast(document.getElementById('toast'), {delay: 3000});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function normalizarProvincia(prov) {
+  if (!prov || prov === '—') return '—';
+  const p = prov.trim();
+  // Si ya es código de 2 letras, retornarlo en mayúscula
+  if (p.length === 2) return p.toUpperCase();
+  // Mapeo inverso: nombre completo → código
+  const NOMBRE_A_CODIGO = {
+    'Buenos Aires': 'BA', 'Catamarca': 'CA', 'Chubut': 'CB', 'Chaco': 'CH',
+    'Córdoba': 'CO', 'Corrientes': 'CT', 'Entre Ríos': 'ER', 'Entre Rios': 'ER',
+    'Formosa': 'FO', 'Jujuy': 'JU', 'La Pampa': 'LP', 'La Rioja': 'LR',
+    'Misiones': 'MI', 'Mendoza': 'MZ', 'Neuquén': 'NQ', 'Neuquen': 'NQ',
+    'Río Negro': 'RN', 'Rio Negro': 'RN', 'Salta': 'SA', 'Santa Cruz': 'SC',
+    'Santiago del Estero': 'SE', 'Santa Fe': 'SF', 'San Juan': 'SJ',
+    'San Luis': 'SL', 'Tierra del Fuego': 'TF', 'Tucumán': 'TU', 'Tucuman': 'TU'
+  };
+  return NOMBRE_A_CODIGO[p] || p;
+}
+
 function fmtDate(s) {
   if (!s) return '—';
   const p = s.slice(0,10).split('-');
@@ -748,7 +766,7 @@ function renderTable(rows) {
       <td class="cell-date">${fmtDate(r.fecha_carga)}</td>
       <td class="cell-exp"><span class="exp-num">${esc(r.num_exp)}</span></td>
       <td class="cell-text">${esc(r.titular)}</td>
-      <td><span class="prov-badge" title="${r.provincia||''}">${PROVINCIAS[r.provincia]||r.provincia||'—'}</span></td>
+      <td><span class="prov-badge" title="${PROVINCIAS[r.provincia]||r.provincia||''}">${normalizarProvincia(r.provincia)}</span></td>
       <td class="cell-small text-end">${esc(r.monto)}</td>
       <td class="cell-small">${esc(linea)}</td>
       <td class="cell-small">${esc(r.garantia)}</td>
