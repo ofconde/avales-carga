@@ -748,7 +748,7 @@ function renderTable(rows) {
       <td class="cell-date">${fmtDate(r.fecha_carga)}</td>
       <td class="cell-exp"><span class="exp-num">${esc(r.num_exp)}</span></td>
       <td class="cell-text">${esc(r.titular)}</td>
-      <td><span class="prov-badge" title="${PROVINCIAS[r.provincia]||''}">${r.provincia||'—'}</span></td>
+      <td><span class="prov-badge" title="${r.provincia||''}">${PROVINCIAS[r.provincia]||r.provincia||'—'}</span></td>
       <td class="cell-small text-end">${esc(r.monto)}</td>
       <td class="cell-small">${esc(linea)}</td>
       <td class="cell-small">${esc(r.garantia)}</td>
