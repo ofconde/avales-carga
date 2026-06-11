@@ -10,7 +10,7 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
-VERSION   = "1.2.0"
+VERSION   = "1.3.0"
 
 # ── Credenciales PEI (para sync de garantías) ─────────────────────────────────
 _PEI_LOGIN_URL   = "https://pei-api.cfi.org.ar/usuarios/token"
@@ -1275,13 +1275,78 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             return [], str(e)
 
+    def _buscar_en_pei_vivo(self, q_str):
+        """
+        Búsqueda ampliada: consulta la bandeja del PEI EN VIVO (mismo endpoint
+        GET BandejaExpedientes que usan los syncs de fondo cada 30 min).
+        Sirve para expedientes recién creados en PEI que todavía no llegaron
+        a bandeja_pei_real (sync cada 15 min). Cache de 60 s para no repetir
+        la descarga si el técnico busca varias veces seguidas.
+        """
+        try:
+            import requests
+            now = time.time()
+            cache = getattr(Handler, '_bandeja_viva_cache', None)
+            if cache and now < cache['expira']:
+                bandeja = cache['data']
+            else:
+                token = _get_pei_token()
+                bandeja = requests.get(_PEI_BANDEJA_URL,
+                                       headers={"Authorization": f"Bearer {token}"},
+                                       timeout=30).json()
+                Handler._bandeja_viva_cache = {'data': bandeja, 'expira': now + 60}
+
+            q = q_str.lower()
+            result = []
+            for r in bandeja:
+                if str(r.get('tipoDeLinea') or '') != 'Crédito':
+                    continue
+                hay = ' '.join([str(r.get('razonSocial') or ''),
+                                str(r.get('denominacionSolicitud') or ''),
+                                str(r.get('cuit') or '')]).lower()
+                if q not in hay:
+                    continue
+                monto_raw = r.get('importeSolicitado')
+                try:
+                    monto = f"$ {int(float(monto_raw)):,}".replace(',', '.') if monto_raw else ''
+                except Exception:
+                    monto = ''
+                entidad = str(r.get('entidadesAvalantes') or '').strip()
+                tipo    = str(r.get('tiposContragarantia') or '').strip()
+                for pref in ['Garantia SGR / FPG — ', 'Garantia SGR / FPG',
+                             'Garantía SGR / FPG — ', 'Garantía SGR / FPG', 'Garantia ']:
+                    if tipo.startswith(pref):
+                        tipo = tipo[len(pref):]
+                        break
+                result.append({
+                    'num_exp':           r.get('denominacionSolicitud') or '',
+                    'titular':           r.get('razonSocial') or '',
+                    'cuit':              r.get('cuit') or '',
+                    'provincia':         r.get('provincia') or '',
+                    'monto':             monto,
+                    'garantia':          entidad or tipo,
+                    'estado_pei':        r.get('estadoExpediente') or '',
+                    'linea_programatica':r.get('linea') or '',
+                    'tec_de_carga':      _norm_tecnico_pei(r.get('nombreRepresentanteComercial') or ''),
+                    'fecha_instruccion': (r.get('fechaSolicitud') or '')[:10],
+                    'fecha_carga':       (r.get('fechaSolicitud') or '')[:10],
+                    '_pei': True,
+                })
+                if len(result) >= 30:
+                    break
+            return result, None
+        except Exception as e:
+            return [], str(e)
+
     def _carga_buscar(self, qs):
         """
         Búsqueda rápida: DB local SQLite + bandeja_pei_real PostgreSQL directo.
-        Sin llamadas HTTP intermedias — consulta SQL en < 1 segundo.
+        Con ampliada=1 consulta además la bandeja del PEI en vivo (para
+        expedientes recién creados que el sync de 15 min aún no trajo).
         """
         try:
             q_str = (qs.get('q') or [''])[0].strip()
+            ampliada = (qs.get('ampliada') or [''])[0] == '1'
             if len(q_str) < 2:
                 return self.send_json([])
 
@@ -1297,8 +1362,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             local = [dict(r) for r in rows]
             local_nums = {r['num_exp'] for r in local}
 
-            # ── 2. Buscar en PEI (PostgreSQL directo) ─────────────
-            pei_only, pei_error = self._buscar_en_pei(q_str)
+            # ── 2. Buscar en PEI ──────────────────────────────────
+            # ampliada → bandeja PEI en vivo; normal → bandeja_pei_real (PG)
+            if ampliada:
+                pei_only, pei_error = self._buscar_en_pei_vivo(q_str)
+                if pei_error:  # fallback a la tabla sincronizada
+                    pei_only, pei_error = self._buscar_en_pei(q_str)
+            else:
+                pei_only, pei_error = self._buscar_en_pei(q_str)
             pei_only = [r for r in pei_only if r['num_exp'] not in local_nums]
 
             resultado = (local + pei_only)[:25]
