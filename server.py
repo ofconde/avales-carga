@@ -10,15 +10,17 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
-VERSION   = "1.3.0"
+VERSION   = "1.3.1"
 
 # ── Credenciales PEI (para sync de garantías) ─────────────────────────────────
 _PEI_LOGIN_URL   = "https://pei-api.cfi.org.ar/usuarios/token"
 _PEI_BANDEJA_URL = "https://pei-api.cfi.org.ar/empresas/BandejaExpedientes"
 _PEI_CTRGAR_URL  = "https://pei-api.cfi.org.ar/expedientes/{id}/contragarantias"
-_PEI_EMAIL    = os.environ.get("PEI_EMAIL",    "oconde@cfi.org.ar")
-_PEI_PASSWORD = os.environ.get("PEI_PASSWORD", "Abr512381..")
-_PEI_NAME     = os.environ.get("PEI_NAME",     "Omar Conde")
+# Credenciales PEI: SOLO por variables de entorno (Railway). Nunca hardcodear
+# (acuerdo con IT 12/06/2026 — las credenciales no viven en el repo).
+_PEI_EMAIL    = os.environ.get("PEI_EMAIL",    "")
+_PEI_PASSWORD = os.environ.get("PEI_PASSWORD", "")
+_PEI_NAME     = os.environ.get("PEI_NAME",     "")
 
 _pei_token_cache = {"token": None, "expires": 0}
 _pei_token_lock  = threading.Lock()
