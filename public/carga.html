@@ -846,6 +846,17 @@ async function _ejecutarBusqueda(val, ampliada) {
 
     // Respuesta con sin_resultados (objeto con flag)
     if (data && data.sin_resultados) {
+      const det = data.pei_error_detalle;
+      let errorMsg = '';
+      if (det === 'db_no_configurada') {
+        errorMsg = '<span class="text-danger ms-1">⚠ Base de datos no conectada — contactar administrador</span>';
+      } else if (det === 'db_error') {
+        errorMsg = '<span class="text-danger ms-1">⚠ Error al conectar con la base de datos</span>';
+      } else if (det === 'pei_api_error') {
+        errorMsg = '<span class="text-warning ms-1">⚠ PEI no respondió — verificar credenciales en Railway</span>';
+      } else if (data.pei_error) {
+        errorMsg = '<span class="text-muted ms-1">(búsqueda en PEI no disponible)</span>';
+      }
       const labelAmpliada = ampliada
         ? ''
         : `<button class="btn btn-sm btn-outline-secondary me-2" onclick="_ejecutarBusqueda('${val.replace(/'/g,"\\'")}', true)">
@@ -854,7 +865,7 @@ async function _ejecutarBusqueda(val, ampliada) {
       c.innerHTML = `
         <div class="text-muted small mb-2">
           No se encontró en la búsqueda${ampliada ? ' ampliada' : ''}.
-          ${data.pei_error ? `<span class="text-danger ms-1">(PEI no respondió)</span>` : ''}
+          ${errorMsg}
         </div>
         <div class="d-flex gap-2 flex-wrap">
           ${labelAmpliada}

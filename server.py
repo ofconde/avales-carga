@@ -386,6 +386,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # ── Backup ─────────────────────────────────────────────────────────
         if path == '/api/backup/db':              return self._backup_db(qs)
         if path == '/api/debug/buscar':           return self._debug_buscar(qs)
+        if path == '/api/debug/estado':           return self._debug_estado()
 
         self.send_response(404); self.end_headers()
 
@@ -1340,6 +1341,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             return [], str(e)
 
+    def _debug_estado(self):
+        """Diagnóstico: verifica conexión PostgreSQL y credenciales PEI."""
+        estado = {
+            "version": VERSION,
+            "db_url_configurada": bool(self.PG_URL),
+            "pg_conexion": None,
+            "pg_error": None,
+            "bandeja_count": None,
+            "pei_email_configurado": bool(_PEI_EMAIL),
+            "pei_password_configurada": bool(_PEI_PASSWORD),
+        }
+        if self.PG_URL:
+            try:
+                import psycopg2
+                with psycopg2.connect(self.PG_URL, connect_timeout=5) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('SELECT COUNT(*) FROM bandeja_pei_real WHERE "tipoDeLinea" = \'Crédito\'')
+                        estado["bandeja_count"] = cur.fetchone()[0]
+                estado["pg_conexion"] = True
+            except Exception as e:
+                estado["pg_conexion"] = False
+                estado["pg_error"] = str(e)
+        self.send_json(estado)
+
     def _carga_buscar(self, qs):
         """
         Búsqueda rápida: DB local SQLite + bandeja_pei_real PostgreSQL directo.
@@ -1366,10 +1391,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             # ── 2. Buscar en PEI ──────────────────────────────────
             # ampliada → bandeja PEI en vivo; normal → bandeja_pei_real (PG)
+            pei_vivo_error = None
             if ampliada:
-                pei_only, pei_error = self._buscar_en_pei_vivo(q_str)
-                if pei_error:  # fallback a la tabla sincronizada
+                pei_only, pei_vivo_error = self._buscar_en_pei_vivo(q_str)
+                if pei_vivo_error:  # fallback a la tabla sincronizada
                     pei_only, pei_error = self._buscar_en_pei(q_str)
+                else:
+                    pei_error = None
             else:
                 pei_only, pei_error = self._buscar_en_pei(q_str)
             pei_only = [r for r in pei_only if r['num_exp'] not in local_nums]
@@ -1377,10 +1405,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             resultado = (local + pei_only)[:25]
 
             if not resultado:
+                # Armar mensaje de error descriptivo
+                if not self.PG_URL:
+                    detalle = "db_no_configurada"
+                elif pei_error and 'DATABASE_URL' in pei_error:
+                    detalle = "db_no_configurada"
+                elif pei_error:
+                    detalle = "db_error"
+                elif pei_vivo_error and ampliada:
+                    detalle = "pei_api_error"
+                else:
+                    detalle = None
                 return self.send_json({
                     'results': [],
                     'sin_resultados': True,
-                    'pei_error': pei_error,
+                    'pei_error': pei_error or pei_vivo_error,
+                    'pei_error_detalle': detalle,
                     'sugerencia': 'manual',
                 })
 
