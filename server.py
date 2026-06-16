@@ -1351,6 +1351,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "bandeja_count": None,
             "pei_email_configurado": bool(_PEI_EMAIL),
             "pei_password_configurada": bool(_PEI_PASSWORD),
+            "pei_name_configurado": bool(_PEI_NAME),
+            "pei_login": None,
+            "pei_login_error": None,
         }
         if self.PG_URL:
             try:
@@ -1363,6 +1366,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 estado["pg_conexion"] = False
                 estado["pg_error"] = str(e)
+        if _PEI_EMAIL and _PEI_PASSWORD:
+            try:
+                import requests as _req
+                r = _req.post(_PEI_LOGIN_URL,
+                              json={"Email": _PEI_EMAIL, "Password": _PEI_PASSWORD, "DisplayName": _PEI_NAME},
+                              timeout=10)
+                if r.status_code == 200 and "accessToken" in r.json():
+                    estado["pei_login"] = True
+                else:
+                    estado["pei_login"] = False
+                    estado["pei_login_error"] = f"HTTP {r.status_code}: {r.text[:200]}"
+            except Exception as e:
+                estado["pei_login"] = False
+                estado["pei_login_error"] = str(e)
         self.send_json(estado)
 
     def _carga_buscar(self, qs):
