@@ -820,6 +820,9 @@ async function editarRegistro(id) {
   qs('reg-modal-title').textContent = 'Editar Registro';
   qs('buscar-section').classList.add('d-none');
   fillForm(data);
+  ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {
+    const el = qs(f); if (el) el.removeAttribute('readonly');
+  });
   qs('form-section').classList.remove('d-none');
   qs('btn-guardar').classList.remove('d-none');
   qs('btn-notif-uep').classList.remove('d-none');
@@ -924,6 +927,9 @@ async function seleccionarRow(idx) {
     const data = await res.json();
     qs('buscar-section').classList.add('d-none');
     fillForm(data);
+    ['r-num_exp','r-titular','r-provincia','r-monto','r-garantia'].forEach(f => {
+      const el = qs(f); if (el) el.removeAttribute('readonly');
+    });
     qs('form-section').classList.remove('d-none');
     qs('btn-guardar').classList.remove('d-none');
     qs('btn-notif-uep').classList.remove('d-none');
@@ -952,13 +958,32 @@ function showBuscar() {
   qs('buscar-resultados').innerHTML = '';
 }
 
+function fmtMontoInput(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return parseInt(digits, 10).toLocaleString('es-AR');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const montoEl = document.getElementById('r-monto');
+  if (montoEl) {
+    montoEl.addEventListener('input', () => {
+      const pos = montoEl.selectionStart;
+      const prev = montoEl.value.length;
+      montoEl.value = fmtMontoInput(montoEl.value);
+      const diff = montoEl.value.length - prev;
+      montoEl.setSelectionRange(pos + diff, pos + diff);
+    });
+  }
+});
+
 function fillForm(d) {
   qs('reg-id').value                  = d.id || '';
   qs('r-num_exp').value               = d.num_exp || '';
   qs('r-titular').value               = d.titular || '';
   qs('r-cuit').value                  = d.cuit || '';
   qs('r-provincia').value             = d.provincia || '';
-  qs('r-monto').value                 = d.monto || '';
+  qs('r-monto').value                 = fmtMontoInput(d.monto);
   qs('r-garantia').value              = d.garantia || '';
   qs('r-fecha_carga').value           = d.fecha_carga || new Date().toISOString().slice(0,10);
   qs('r-tec_de_carga').value          = d.tec_de_carga || '';
