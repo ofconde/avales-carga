@@ -138,6 +138,14 @@ def init_db():
             new_g = _norm_garantia(r[1])
             if new_g != r[1]:
                 conn.execute("UPDATE expedientes SET garantia=? WHERE id=?", (new_g, r[0]))
+        # Normalizar montos: "4699552.0" / "$ 4.699.552" / etc → "4.699.552"
+        rows_monto = conn.execute("SELECT id, monto FROM expedientes WHERE monto IS NOT NULL AND monto != ''").fetchall()
+        for r in rows_monto:
+            n = parse_monto(r[1])
+            if n > 0:
+                fmt = f"{int(n):,}".replace(',', '.')
+                if fmt != r[1]:
+                    conn.execute("UPDATE expedientes SET monto=? WHERE id=?", (fmt, r[0]))
 
 def get_config():
     with open(CONFIG_PATH, encoding='utf-8') as f:
