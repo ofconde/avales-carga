@@ -71,6 +71,9 @@
     .obs-lbl { font-size: 7.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #aaa; margin-bottom: 6px; }
     .obs-val { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: #15140F; }
 
+    /* Annual evolution chart */
+    .anual-chart { margin-bottom: 28px; }
+
     /* Province grid — 2 cols, full names */
     .prov-grid { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 28px; row-gap: 7px; margin-bottom: 28px; }
     .prov-row { display: grid; grid-template-columns: 9px 1fr auto 28px 50px; align-items: center; gap: 6px; }
@@ -148,7 +151,7 @@ function fmtMes(m) {
 }
 function fmtC(n) {
   if (!n || n === 0) return '—';
-  if (n >= 1e9) return '$' + (n/1e9).toFixed(2).replace('.',',') + ' mil M';
+  if (n >= 1e9) return '$' + (n/1e9).toFixed(2).replace('.',',') + ' mil M';
   if (n >= 1e6) return '$' + Math.round(n/1e6) + 'M';
   if (n >= 1e3) return '$' + Math.round(n/1e3) + 'K';
   return '$' + Math.round(n);
@@ -225,32 +228,87 @@ function buildDonut(items, totalMonto) {
   </svg>`;
 }
 
+const MESES_ABBR = ['Ene','Feb','Mar','Abr','May','Jun',
+                    'Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function buildAnual(anual, currentMes) {
+  const year = currentMes.slice(0, 4);
+  // Serie completa Ene→Dic, 0 en meses sin datos
+  const byMes = {};
+  (anual.por_mes || []).forEach(m => { byMes[m.mes] = m.total || 0; });
+  const serie = MESES_ABBR.map((_, i) => {
+    const key = `${year}-${String(i+1).padStart(2,'0')}`;
+    return { i, val: byMes[key] || 0, current: key === currentMes };
+  });
+  const maxVal = Math.max(1, ...serie.map(s => s.val));
+
+  // Geometría
+  const W = 652, H = 148, padTop = 24, padBot = 22;
+  const plotH = H - padTop - padBot;
+  const slotW = W / 12;
+  const barW  = slotW * 0.46;
+  const baseY = padTop + plotH;
+
+  const bars = serie.map(s => {
+    const cx    = slotW * s.i + slotW / 2;
+    const x     = cx - barW / 2;
+    const barH  = s.val > 0 ? Math.max(2, (s.val / maxVal) * plotH) : 0;
+    const y     = baseY - barH;
+    const color = s.current ? '#D4A830' : '#2E5A2E';
+    const labelColor = s.current ? '#15140F' : '#999';
+    const valTxt = s.val > 0
+      ? `<text x="${cx.toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle"
+           font-family="-apple-system,sans-serif" font-size="8.5"
+           font-weight="${s.current?'700':'600'}" fill="${s.current?'#15140F':'#666'}">${s.val}</text>`
+      : '';
+    return `
+      ${barH>0 ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1.5" fill="${color}"/>` : ''}
+      ${valTxt}
+      <text x="${cx.toFixed(1)}" y="${(baseY+13).toFixed(1)}" text-anchor="middle"
+        font-family="-apple-system,sans-serif" font-size="8"
+        font-weight="${s.current?'700':'500'}" fill="${labelColor}"
+        letter-spacing="0.02em">${MESES_ABBR[s.i]}</text>`;
+  }).join('');
+
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    <line x1="0" y1="${baseY}" x2="${W}" y2="${baseY}" stroke="#e5e0d6" stroke-width="1"/>
+    ${bars}
+  </svg>`;
+}
+
 async function init() {
   const mes = new URLSearchParams(location.search).get('mes')
             || new Date().toISOString().slice(0,7);
 
-  const [smRes, stRes, provRes] = await Promise.all([
+  const year = mes.slice(0, 4);
+  const [smRes, stRes, provRes, anRes] = await Promise.all([
     fetch(`/api/carga/stats_mensuales?mes=${mes}`),
     fetch(`/api/carga/stats?mes=${mes}`),
     fetch('/api/config/provincias'),
+    fetch(`/api/carga/anual?year=${year}`),
   ]);
   const sm     = await smRes.json();
   const stats  = await stRes.json();
   const provMap = await provRes.json();
+  const anual  = await anRes.json();
 
   if (sm.error) {
     document.getElementById('page').innerHTML =
       `<p style="color:red;padding:40px">Error: ${sm.error}</p>`; return;
   }
-  render(mes, sm, stats, provMap);
+  render(mes, sm, stats, provMap, anual);
 }
 
-function render(mes, sm, stats, provMap) {
+function render(mes, sm, stats, provMap, anual) {
   const r = sm.resumen;
   const total      = r.total_ars + r.total_usd;
   const promedio   = r.total_ars > 0 ? r.monto_ars / r.total_ars : 0;
   const provsActivas = sm.por_provincia.filter(p => p.total_ars + p.total_usd > 0).length;
   const now = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
+
+  // ── Evolución anual ───────────────────────────────────────────────────────
+  const anualOk   = anual && !anual.error && (anual.total_anual || 0) > 0;
+  const anualChart = anualOk ? buildAnual(anual, mes) : '';
 
   // ── Province grid ─────────────────────────────────────────────────────────
   const maxProv = Math.max(1, ...sm.por_provincia.map(p => p.total_ars + p.total_usd));
@@ -364,6 +422,10 @@ function render(mes, sm, stats, provMap) {
       <span class="usd-note-val">${fmtUSD(r.monto_usd)}</span>
       <span>en ${r.total_usd} solicitud${r.total_usd > 1 ? 'es' : ''} &mdash; no incluidas en montos ARS.</span>
     </div>` : '<div style="margin-bottom:28px"></div>'}
+
+    ${anualOk ? `
+    <div class="sh"><span class="sh-t">Evolución del A&ntilde;o</span><span class="sh-s">00 &mdash; Solicitudes ingresadas por mes &middot; ${mes.slice(0,4)}</span></div>
+    <div class="anual-chart">${anualChart}</div>` : ''}
 
     ${sm.por_provincia.length ? `
     <div class="sh"><span class="sh-t">Distribución por Provincia</span><span class="sh-s">01 &mdash; Cantidad y monto solicitado</span></div>
