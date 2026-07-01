@@ -148,7 +148,7 @@ function fmtMes(m) {
 }
 function fmtC(n) {
   if (!n || n === 0) return '—';
-  if (n >= 1e9) return '$' + (n/1e9).toFixed(2).replace('.',',') + 'B';
+  if (n >= 1e9) return '$' + (n/1e9).toFixed(2).replace('.',',') + ' mil M';
   if (n >= 1e6) return '$' + Math.round(n/1e6) + 'M';
   if (n >= 1e3) return '$' + Math.round(n/1e3) + 'K';
   return '$' + Math.round(n);
