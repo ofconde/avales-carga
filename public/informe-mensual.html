@@ -9,6 +9,15 @@
       .no-print { display: none !important; }
       body { background: none !important; padding: 0 !important; }
       .page { box-shadow: none !important; margin: 0 !important; }
+      /* No cortar un encabezado de sección de su contenido */
+      .sh { break-after: avoid; page-break-after: avoid; }
+      /* No partir bloques cohesivos por la mitad */
+      .stats-bar, .usd-note, .anual-chart, .lines-layout,
+      .obs-grid, .region-grid { break-inside: avoid; page-break-inside: avoid; }
+      /* No partir celdas/filas individuales entre páginas */
+      .ava-cell, .prov-row, .region-cell, .obs-cell, .leg-row {
+        break-inside: avoid; page-break-inside: avoid;
+      }
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
