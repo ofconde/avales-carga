@@ -1096,10 +1096,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     resumen['total_ars'] += 1
                     resumen['monto_ars'] += monto
 
-                inc(regiones,  region,                       monto, usd)
-                inc(provincias, prov or '(Sin provincia)',   monto, usd)
-                inc(lineas,    linea or '(Sin línea)',       monto, usd)
-                inc(garantias, garantia or '(Sin garantía)', monto, usd)
+                inc(regiones,  region,                                              monto, usd)
+                inc(provincias, _norm_provincia(prov, num_exp) or '(Sin provincia)', monto, usd)
+                inc(lineas,    linea or '(Sin línea)',                               monto, usd)
+                inc(garantias, _norm_garantia(garantia) or '(Sin garantía)',         monto, usd)
 
             def to_list(d, key_name):
                 return sorted(
