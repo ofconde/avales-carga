@@ -1086,7 +1086,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 garantia = r[4] or ''
                 usd = is_usd(num_exp)
 
-                code   = prov_code_from_exp(num_exp)
+                code   = _norm_provincia(prov, num_exp)
                 region = self.REGIONES.get(code, prov or '(Sin región)')
 
                 if usd:
