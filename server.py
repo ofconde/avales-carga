@@ -10,7 +10,7 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
-VERSION   = "1.3.1"
+VERSION   = "1.4.0"
 
 # ── Credenciales PEI (para sync de garantías) ─────────────────────────────────
 _PEI_LOGIN_URL   = "https://pei-api.cfi.org.ar/usuarios/token"
@@ -223,6 +223,28 @@ def _prov_from_num_exp(num_exp):
         if code in _CODIGOS_VALIDOS:
             return code
     return ''
+
+def _prov_variantes(v):
+    """Todas las formas en que una provincia puede estar guardada en la columna.
+
+    La columna `provincia` tiene valores mixtos: código ("TU") y nombre
+    ("Tucumán"), según por dónde entró el expediente. Para filtrar sin perder
+    filas se aceptan todas las variantes del mismo destino.
+    Devuelve [] si no se reconoce la provincia (el filtro queda literal).
+    """
+    raw = (v or '').strip()
+    if not raw:
+        return []
+    codigo = _PROV_NOMBRE_A_CODIGO.get(raw.lower(), raw.upper())
+    if codigo not in _CODIGOS_VALIDOS:
+        return [raw]
+    variantes = {codigo}
+    for nombre, cod in _PROV_NOMBRE_A_CODIGO.items():
+        if cod == codigo:
+            variantes.add(nombre)          # "tucumán"
+            variantes.add(nombre.title())  # "Tucumán"
+    return sorted(variantes)
+
 
 def _norm_provincia(v, num_exp=None):
     """Normaliza provincia: prioriza el código extraído del num_exp (fuente de verdad),
@@ -922,8 +944,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             p    = [mes]
 
             if provincia:
-                base += " AND provincia = ?"
-                p.append(provincia)
+                # Igualdad literal perdía las filas guardadas con el nombre
+                # completo en vez del código -- en agosto/2026 eran 23 de 42.
+                _vars = _prov_variantes(provincia)
+                base += " AND provincia IN (%s)" % ','.join('?' * len(_vars))
+                p.extend(_vars)
 
             def agg(conn, group_col):
                 rows = conn.execute(f"""
@@ -945,7 +970,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 leg_si   = conn.execute(f"SELECT COUNT(*) {base} AND devolvio_legales='SI'", p).fetchone()[0]
                 pend_uep = conn.execute(f"SELECT COUNT(*) {base} AND tecnico != '' AND (fecha_respuesta_uep IS NULL OR fecha_respuesta_uep='')", p).fetchone()[0]
 
-                by_prov    = agg(conn, 'provincia')
+                # Se normaliza y fusiona para que "TU" y "Tucumán" no salgan
+                # como dos grupos distintos (igual criterio que _norm_linea).
+                _prov_norm = {}
+                for _it in agg(conn, 'provincia'):
+                    _k = _norm_provincia(_it['grupo']) or _it['grupo']
+                    _prov_norm[_k] = _prov_norm.get(_k, 0) + _it['total']
+                by_prov = sorted([{'grupo': k, 'total': v} for k, v in _prov_norm.items()],
+                                 key=lambda x: -x['total'])
                 by_linea_raw = agg(conn, "CASE WHEN linea_manual != '' THEN linea_manual ELSE linea_programatica END")
                 by_garantia= agg(conn, 'garantia')
                 by_tec     = agg(conn, 'tec_de_carga')
@@ -994,6 +1026,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 """, p).fetchall()
                 prov_m = {}
                 for prov, m in prov_montos:
+                    prov = _norm_provincia(prov) or prov
                     prov_m.setdefault(prov, 0)
                     prov_m[prov] += parse_monto(m)
                 by_prov_monto = [{'grupo': k, 'monto': v} for k, v in sorted(prov_m.items(), key=lambda x: -x[1])]
@@ -1501,10 +1534,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             for f in fields:
                 if f not in seen: seen.add(f); unique_fields.append(f)
             cols = [f for f in unique_fields if f in d or f == 'num_exp']
+            # Normalizar igual que _create/_update/_bulk. Sin esto, cada alta
+            # desde el formulario de carga guardaba la provincia tal cual venía
+            # ("Tucumán" en vez de "TU"), y los paneles provinciales -- que
+            # filtran por código -- no veían esos expedientes.
             vals = []
             for f in cols:
                 if f == 'num_exp':
                     vals.append(num_exp)
+                elif f == 'provincia':
+                    vals.append(_norm_provincia(d.get(f) or '', num_exp) or None)
+                elif f == 'garantia':
+                    vals.append(_norm_garantia(d.get(f) or '') or None)
                 else:
                     vals.append(d.get(f) or None)
             placeholders = ','.join('?' * len(cols))
@@ -1525,6 +1566,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             campos = {k: d.get(k) for k in self.CARGA_FIELDS if k in d}
             if not campos:
                 return self.send_json({'error': 'Sin campos para actualizar'}, 400)
+            # CARGA_FIELDS incluye provincia y garantia: se normalizan igual que
+            # en el alta, para no reintroducir valores crudos al editar.
+            if 'provincia' in campos:
+                _ne = (d.get('num_exp') or '').strip().upper()
+                if not _ne:
+                    with get_db() as _c:
+                        _r = _c.execute("SELECT num_exp FROM expedientes WHERE id=?", (eid,)).fetchone()
+                        _ne = (_r[0] if _r else '') or ''
+                campos['provincia'] = _norm_provincia(campos['provincia'] or '', _ne) or None
+            if 'garantia' in campos:
+                campos['garantia'] = _norm_garantia(campos['garantia'] or '') or None
             set_clause = ', '.join(f"{k}=?" for k in campos)
             vals = list(campos.values()) + [eid]
             with get_db() as conn:
