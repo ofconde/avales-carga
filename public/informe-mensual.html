@@ -40,6 +40,17 @@
       letter-spacing: 0.06em;
     }
     .btn-print:hover { background: #2e2d22; }
+    .toolbar-right { display: flex; align-items: center; gap: 10px; }
+    .sel-mes-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #aaa;
+    }
+    .sel-mes {
+      background: #fff; color: #15140F; border: 1px solid #d8d2c4;
+      border-radius: 4px; padding: 6px 10px; font-size: 11px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+    }
+    .sel-mes:focus { outline: none; border-color: #15140F; }
     .page {
       background: #fff; width: 740px; max-width: 100%;
       padding: 40px 44px; box-shadow: 0 3px 24px rgba(0,0,0,0.14);
@@ -132,7 +143,11 @@
 <body>
 <div class="toolbar no-print">
   <a href="/carga" class="btn-back">← Volver al tablero</a>
-  <button class="btn-print" onclick="window.print()">↓ Imprimir / Exportar PDF</button>
+  <div class="toolbar-right">
+    <label class="sel-mes-label" for="sel-mes">Mes del informe</label>
+    <select class="sel-mes" id="sel-mes"></select>
+    <button class="btn-print" onclick="window.print()">↓ Imprimir / Exportar PDF</button>
+  </div>
 </div>
 <div class="page" id="page">
   <p style="text-align:center;padding:40px;color:#aaa">Cargando informe…</p>
@@ -285,9 +300,43 @@ function buildAnual(anual, currentMes) {
   </svg>`;
 }
 
-async function init() {
-  const mes = new URLSearchParams(location.search).get('mes')
-            || new Date().toISOString().slice(0,7);
+function mesActualLocal() {
+  // Hora local, NO toISOString(): en UTC-3 el último día del mes salta al siguiente.
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+async function mesesConDatos() {
+  try {
+    const res = await fetch('/api/carga/meses');
+    const data = await res.json();
+    return Array.isArray(data) ? data.filter(m => m && m.mes) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function pintarSelectorMeses(meses, mesActivo) {
+  const sel = document.getElementById('sel-mes');
+  if (!sel) return;
+  // El mes activo siempre figura, aunque todavía no tenga expedientes cargados.
+  const opciones = meses.slice();
+  if (!opciones.some(m => m.mes === mesActivo)) {
+    opciones.push({ mes: mesActivo, total: 0 });
+    opciones.sort((a, b) => b.mes.localeCompare(a.mes));
+  }
+  sel.innerHTML = opciones.map(m =>
+    `<option value="${m.mes}"${m.mes === mesActivo ? ' selected' : ''}>` +
+    `${fmtMes(m.mes)}${m.total ? ` (${m.total})` : ''}</option>`
+  ).join('');
+  sel.onchange = () => cargarInforme(sel.value);
+}
+
+async function cargarInforme(mes) {
+  const page = document.getElementById('page');
+  page.innerHTML = `<p style="text-align:center;padding:40px;color:#aaa">Cargando ${fmtMes(mes)}…</p>`;
+  // La URL acompaña al mes elegido: recargar o compartir el link mantiene el informe.
+  history.replaceState(null, '', `?mes=${mes}`);
 
   const year = mes.slice(0, 4);
   const [smRes, stRes, provRes, anRes] = await Promise.all([
@@ -296,16 +345,27 @@ async function init() {
     fetch('/api/config/provincias'),
     fetch(`/api/carga/anual?year=${year}`),
   ]);
-  const sm     = await smRes.json();
-  const stats  = await stRes.json();
+  const sm      = await smRes.json();
+  const stats   = await stRes.json();
   const provMap = await provRes.json();
-  const anual  = await anRes.json();
+  const anual   = await anRes.json();
 
   if (sm.error) {
-    document.getElementById('page').innerHTML =
-      `<p style="color:red;padding:40px">Error: ${sm.error}</p>`; return;
+    page.innerHTML = `<p style="color:red;padding:40px">Error: ${sm.error}</p>`;
+    return;
   }
   render(mes, sm, stats, provMap, anual);
+}
+
+async function init() {
+  const pedido = new URLSearchParams(location.search).get('mes');
+  const meses  = await mesesConDatos();
+  // Sin ?mes= explícito, arranca en el último mes CON datos (el mes en curso puede
+  // estar vacío los primeros días) y recién ahí cae al mes calendario.
+  const mes = pedido || (meses.length ? meses[0].mes : mesActualLocal());
+
+  pintarSelectorMeses(meses, mes);
+  await cargarInforme(mes);
 }
 
 function render(mes, sm, stats, provMap, anual) {
