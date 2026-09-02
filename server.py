@@ -10,7 +10,7 @@ from pathlib import Path
 import urllib.parse
 import urllib.request
 
-VERSION   = "1.5.0"
+VERSION   = "1.6.0"
 
 # ── Credenciales PEI (para sync de garantías) ─────────────────────────────────
 _PEI_LOGIN_URL   = "https://pei-api.cfi.org.ar/usuarios/token"

@@ -620,6 +620,18 @@ function prevMes() {
   const d = new Date(y, m-2);
   mesCurrent = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
   offset = 0;
+  // Click en cualquier parte de la fila abre el expediente (delegado en el
+  // tbody, que se re-renderiza entero en cada carga).
+  qs('carga-tbody').addEventListener('click', (ev) => {
+    // Los controles propios de la celda siguen mandando (botón Editar, links).
+    if (ev.target.closest('button, a, input, select, textarea, label')) return;
+    // Si el usuario estaba seleccionando texto para copiarlo, no abrir nada.
+    const sel = window.getSelection && window.getSelection().toString();
+    if (sel && sel.trim()) return;
+    const fila = ev.target.closest('tr[data-id]');
+    if (fila) editarRegistro(Number(fila.dataset.id));
+  });
+
   updatePeriodUI();
   loadMes();
 }
@@ -631,6 +643,18 @@ function nextMes() {
   if (next > mesActual) return;
   mesCurrent = next;
   offset = 0;
+  // Click en cualquier parte de la fila abre el expediente (delegado en el
+  // tbody, que se re-renderiza entero en cada carga).
+  qs('carga-tbody').addEventListener('click', (ev) => {
+    // Los controles propios de la celda siguen mandando (botón Editar, links).
+    if (ev.target.closest('button, a, input, select, textarea, label')) return;
+    // Si el usuario estaba seleccionando texto para copiarlo, no abrir nada.
+    const sel = window.getSelection && window.getSelection().toString();
+    if (sel && sel.trim()) return;
+    const fila = ev.target.closest('tr[data-id]');
+    if (fila) editarRegistro(Number(fila.dataset.id));
+  });
+
   updatePeriodUI();
   loadMes();
 }
@@ -639,6 +663,18 @@ function irAMes(m) {
   if (!m) return;
   mesCurrent = m;
   offset = 0;
+  // Click en cualquier parte de la fila abre el expediente (delegado en el
+  // tbody, que se re-renderiza entero en cada carga).
+  qs('carga-tbody').addEventListener('click', (ev) => {
+    // Los controles propios de la celda siguen mandando (botón Editar, links).
+    if (ev.target.closest('button, a, input, select, textarea, label')) return;
+    // Si el usuario estaba seleccionando texto para copiarlo, no abrir nada.
+    const sel = window.getSelection && window.getSelection().toString();
+    if (sel && sel.trim()) return;
+    const fila = ev.target.closest('tr[data-id]');
+    if (fila) editarRegistro(Number(fila.dataset.id));
+  });
+
   updatePeriodUI();
   loadMes();
   qs('sel-mes-historico').value = '';
@@ -762,7 +798,7 @@ function renderTable(rows) {
       ? '<span class="badge bg-light text-dark">NO</span>'
       : '<span class="badge bg-secondary">—</span>';
 
-    return `<tr>
+    return `<tr class="row-exp" data-id="${r.id}" title="Abrir el expediente">
       <td class="cell-date">${fmtDate(r.fecha_carga)}</td>
       <td class="cell-exp"><span class="exp-num">${esc(r.num_exp)}</span></td>
       <td class="cell-text">${esc(r.titular)}</td>
@@ -1432,6 +1468,18 @@ async function init() {
   ['f-search','f-provincia','f-linea','f-garantia','f-tec','f-paso','f-legales'].forEach(id => {
     const el = qs(id);
     el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => { offset = 0; loadMes(); });
+  });
+
+  // Click en cualquier parte de la fila abre el expediente (delegado en el
+  // tbody, que se re-renderiza entero en cada carga).
+  qs('carga-tbody').addEventListener('click', (ev) => {
+    // Los controles propios de la celda siguen mandando (botón Editar, links).
+    if (ev.target.closest('button, a, input, select, textarea, label')) return;
+    // Si el usuario estaba seleccionando texto para copiarlo, no abrir nada.
+    const sel = window.getSelection && window.getSelection().toString();
+    if (sel && sel.trim()) return;
+    const fila = ev.target.closest('tr[data-id]');
+    if (fila) editarRegistro(Number(fila.dataset.id));
   });
 
   updatePeriodUI();

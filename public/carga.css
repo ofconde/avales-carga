@@ -183,3 +183,7 @@
   color: #888;
   margin-bottom: 4px;
 }
+
+/* Fila clickeable: abre el expediente desde cualquier celda (el botón Editar
+   sigue estando para quien lo busque ahí). */
+.carga-table tbody tr.row-exp { cursor: pointer; }
