@@ -1051,19 +1051,52 @@ function abrirMailto() {
   window.location.href = window._notifMailto || '';
 }
 
-function copiarCampo(id) {
-  const el = qs(id);
-  navigator.clipboard.writeText(el.value || el.textContent || '').then(() => {
-    showToast('Copiado al portapapeles');
-  });
+// navigator.clipboard no está disponible en todos los contextos: dentro del
+// iframe del Portal FP (otro dominio) el navegador lo bloquea salvo que el
+// iframe declare allow="clipboard-write". Antes la promesa se rechazaba sin
+// catch y el botón no hacía absolutamente nada. Ahora cae a execCommand y,
+// si tampoco se puede, avisa en vez de fallar en silencio.
+async function copiarAlPortapapeles(texto) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+  } catch (e) { /* sigue con el fallback */ }
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
 }
 
-function copiarTodo() {
-  const texto = qs('notif-cuerpo').value;
-  navigator.clipboard.writeText(texto).then(() => {
-    qs('notif-copiar-msg').classList.remove('d-none');
-    setTimeout(() => qs('notif-copiar-msg').classList.add('d-none'), 3000);
-  });
+async function copiarCampo(id) {
+  const el = qs(id);
+  const ok = await copiarAlPortapapeles(el.value || el.textContent || '');
+  showToast(ok ? 'Copiado al portapapeles' : 'No se pudo copiar: seleccioná el texto y copialo a mano', ok);
+}
+
+async function copiarTodo() {
+  const ok = await copiarAlPortapapeles(qs('notif-cuerpo').value);
+  if (!ok) {
+    qs('notif-cuerpo').focus();
+    qs('notif-cuerpo').select();
+    showToast('No se pudo copiar automáticamente: el texto quedó seleccionado, usá Ctrl+C', false);
+    return;
+  }
+  qs('notif-copiar-msg').classList.remove('d-none');
+  setTimeout(() => qs('notif-copiar-msg').classList.add('d-none'), 3000);
 }
 
 function notificarUEP() {
